@@ -409,7 +409,12 @@ namespace ScottmenMainApi.Models.BLayer
         public Int16? active { get; set; } = (Int16)IsActive.Yes;
 
     }
-
+    public class ItemStockMaster
+    {
+        public long? userId { get; set; }
+        public string? clientIp { get; set; }
+        public List<ItemStock> stock { get; set; }
+    }
     public class ItemStock
     {
         public long? itemStockId { get; set; }

@@ -4331,6 +4331,11 @@ namespace ScottmenMainApi.Models.DLayer
                     ds.dataset.Tables.Add(dt.table);
                 }
             }
+            else
+            {
+                dt.table.TableName = "Vendor";
+                ds.dataset.Tables.Add(dt.table);
+            }
             return ds;
         }
         /// <summary>
@@ -4750,6 +4755,7 @@ namespace ScottmenMainApi.Models.DLayer
                             ORDER BY u.creationTimeStamp DESC ";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             ds.status = true;
+
             if (dt.table.Rows.Count > 0)
             {
 
@@ -4765,6 +4771,11 @@ namespace ScottmenMainApi.Models.DLayer
                     dt.table.TableName = "Unloading_Items";
                     ds.dataset.Tables.Add(dt.table);
                 }
+            }
+            else
+            {
+                dt.table.TableName = "Unloading_List";
+                ds.dataset.Tables.Add(dt.table);
             }
             return ds;
         }
@@ -5081,6 +5092,7 @@ namespace ScottmenMainApi.Models.DLayer
                             ORDER BY u.creationTimeStamp DESC ";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             ds.status = true;
+
             if (dt.table.Rows.Count > 0)
             {
 
@@ -5096,6 +5108,11 @@ namespace ScottmenMainApi.Models.DLayer
                     dt.table.TableName = "Loading_Items";
                     ds.dataset.Tables.Add(dt.table);
                 }
+            }
+            else
+            {
+                dt.table.TableName = "Loading_List";
+                ds.dataset.Tables.Add(dt.table);
             }
             return ds;
         }
@@ -5336,12 +5353,9 @@ namespace ScottmenMainApi.Models.DLayer
                       ORDER BY u.creationTimeStamp DESC ";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             ds.status = true;
-            if (dt.table.Rows.Count > 0)
-            {
+            dt.table.TableName = "visitor_List";
+            ds.dataset.Tables.Add(dt.table);
 
-                dt.table.TableName = "visitor_List";
-                ds.dataset.Tables.Add(dt.table);
-            }
             return ds;
         }
         /// <summary>
@@ -5422,12 +5436,10 @@ namespace ScottmenMainApi.Models.DLayer
                       ORDER BY u.creationTimeStamp DESC ";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             ds.status = true;
-            if (dt.table.Rows.Count > 0)
-            {
 
-                dt.table.TableName = "list";
-                ds.dataset.Tables.Add(dt.table);
-            }
+            dt.table.TableName = "list";
+            ds.dataset.Tables.Add(dt.table);
+
             return ds;
         }
 
@@ -5436,10 +5448,10 @@ namespace ScottmenMainApi.Models.DLayer
         /// </summary>
         /// <param name="itemStock"></param>
         /// <returns></returns>
-        public async Task<ReturnClass.ReturnString> SaveRowMaterialInStock(List<ItemStock> itemStock)
+        public async Task<ReturnClass.ReturnString> SaveRowMaterialInStock(ItemStockMaster itemStock)
         {
             bool isItemExistsInStock = false;
-            ReturnClass.ReturnString rs = await ItemExistsInStock((long)itemStock[0].unloadingId);
+            ReturnClass.ReturnString rs = await ItemExistsInStock((long)itemStock.stock[0].unloadingId);
             isItemExistsInStock = rs.status;
 
             rs = await GenerateItemStockId();
@@ -5453,7 +5465,7 @@ namespace ScottmenMainApi.Models.DLayer
             {
                 MySqlParameter[] pm = new MySqlParameter[] {
 
-                    new MySqlParameter("@unloadingId", MySqlDbType.Int64) { Value = itemStock[0].unloadingId}
+                    new MySqlParameter("@unloadingId", MySqlDbType.Int64) { Value = itemStock.stock[0].unloadingId}
                 };
 
                 if (isItemExistsInStock)
@@ -5481,7 +5493,7 @@ namespace ScottmenMainApi.Models.DLayer
                         rb.status = true;
                     if (rb.status)
                     {
-                        rb = await AddItemInStockAsync(itemStock, ItemStockId, isItemExistsInStock, 1);
+                        rb = await AddItemInStockAsync(itemStock.stock, ItemStockId, isItemExistsInStock, 1);
                         if (rb.status)
                             ts.Complete();
                     }
@@ -5657,9 +5669,8 @@ namespace ScottmenMainApi.Models.DLayer
                 counter++; ItemStockId++;
             }
             query = query.TrimEnd(',');
-            ReturnBool rb = await db.ExecuteQueryAsync(updateQuery, pm.ToArray(), "UpdateitemMaster");
-            if (rb.status)
-                rb = await db.ExecuteQueryAsync(query, pm.ToArray(), "Saveitemstockdetail");
+
+            rb = await db.ExecuteQueryAsync(query, pm.ToArray(), "Saveitemstockdetail");
             return rb;
         }
         public async Task<ReturnClass.ReturnBool> RemoveItemfromStockAsync(Int64 ItemStockId)
@@ -5742,12 +5753,10 @@ namespace ScottmenMainApi.Models.DLayer
                       ORDER BY u.creationTimeStamp DESC ";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             ds.status = true;
-            if (dt.table.Rows.Count > 0)
-            {
 
-                dt.table.TableName = "itemstockdetail";
-                ds.dataset.Tables.Add(dt.table);
-            }
+            dt.table.TableName = "itemstockdetail";
+            ds.dataset.Tables.Add(dt.table);
+
             return ds;
         }
         #endregion
@@ -6068,12 +6077,11 @@ namespace ScottmenMainApi.Models.DLayer
                         JOIN blendingitem bi ON bi.batchId=bm.batchId
                         WHERE bi.active=@active " + WHERE;
                 dt = await db.ExecuteSelectQueryAsync(query, pm);
-                if (dt.table.Rows.Count > 0)
-                {
-                    ds.status = true;
-                    dt.table.TableName = "blendingItem";
-                    ds.dataset.Tables.Add(dt.table);
-                }
+
+                ds.status = true;
+                dt.table.TableName = "blendingItem";
+                ds.dataset.Tables.Add(dt.table);
+
             }
             return ds;
         }
@@ -6498,13 +6506,11 @@ namespace ScottmenMainApi.Models.DLayer
                         WHERE b.active=@active " + WHERE;
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             ds.status = true;
-            if (dt.table.Rows.Count > 0)
-            {
 
-                dt.table.TableName = "blendingmaterialissue";
-                ds.dataset.Tables.Add(dt.table);
+            dt.table.TableName = "blendingmaterialissue";
+            ds.dataset.Tables.Add(dt.table);
 
-            }
+
             return ds;
         }
 
@@ -6534,6 +6540,9 @@ namespace ScottmenMainApi.Models.DLayer
                 rs.message = "brandId should not be empty .";
                 return rs;
             }
+            bool isFinalMasterProductExist = await GetFinishedProductMasterData(finishedProduct);
+
+
             finishedProduct.productId = finishedProduct.productId == null ? 0 : finishedProduct.productId;
 
             decimal netQuantity = 0, netBalanceQuantity = 0, oldQuantity = 0;
@@ -6670,7 +6679,7 @@ namespace ScottmenMainApi.Models.DLayer
                         rb = await db.ExecuteQueryAsync(query, pm, "insertfinishedproduct");
                         if (rb.status)
                         {
-                            if (isfinishedProductExists)
+                            if (isFinalMasterProductExist)
                                 rb = await IncreaseFinalProduct((long)finishedProduct.batchId!, (long)finishedProduct.brandId, (long)finishedProduct.totalQuantity);
                             else
                             {
@@ -6778,6 +6787,32 @@ namespace ScottmenMainApi.Models.DLayer
 
                 };
             return await db.ExecuteSelectQueryAsync(query, pm);
+        }
+        private async Task<bool> GetFinishedProductMasterData(FinishedProduct finishedProduct)
+        {
+            ReturnClass.ReturnString rs = new();
+            string where = "";
+            if (finishedProduct.batchId > 0)
+                where += " AND fm.batchId=@batchId ";
+            if (finishedProduct.brandId > 0)
+                where += " AND fm.brandId=@brandId ";
+
+
+
+            string query = @"SELECT fm.batchId                                                                           
+                                    FROM finishedproducmaster fm WHERE fm.active=@active " + where;
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+                    new MySqlParameter("@active", MySqlDbType.Int64) { Value =( Int16)IsActive.Yes},
+                    new MySqlParameter("@batchId", MySqlDbType.Int64) { Value = finishedProduct.batchId},
+                    new MySqlParameter("@brandId", MySqlDbType.Int64) { Value = finishedProduct.brandId},
+
+                };
+            bool istrue = false;
+            dt = await db.ExecuteSelectQueryAsync(query, pm);
+            if (dt.table.Rows.Count > 0)
+                istrue = true;
+            return istrue;
         }
 
 
