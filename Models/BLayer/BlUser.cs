@@ -411,7 +411,7 @@ namespace ScottmenMainApi.Models.BLayer
     }
     public class ItemStockMaster
     {
-        public long? userId { get; set; }
+        public long? userId { get; set; } = 0;
         public string? clientIp { get; set; }
         public List<ItemStock> stock { get; set; }
     }
@@ -433,7 +433,7 @@ namespace ScottmenMainApi.Models.BLayer
         public string? remark { get; set; }
         public decimal? amount { get; set; }
         public Int16? active { get; set; } = (Int16)IsActive.Yes;
-        public long? userId { get; set; }
+        public long? userId { get; set; } = 0;
         public string? clientIp { get; set; }
 
     }
@@ -571,7 +571,7 @@ namespace ScottmenMainApi.Models.BLayer
     }
 
     public class DispatchDetail
-    {        
+    {
         public long? batchId { get; set; }
         public Int32? brandId { get; set; }
         public string? brandName { get; set; }
