@@ -6286,7 +6286,6 @@ namespace ScottmenMainApi.Models.DLayer
                 }
                 counter++;
                 issueMaterial.issueId++;
-
             }
             query = query.TrimEnd(',');
 
@@ -6365,15 +6364,16 @@ namespace ScottmenMainApi.Models.DLayer
         {
 
             ReturnClass.ReturnString rs = new();
-            if (issueMaterial.issueId > 0)
+            if (issueMaterial.IssuePackagingMaterials[0].issueId > 0)
             {
-                rs = await CheckItemIssued(issueMaterial);
-                if (!rs.status)
-                {
-                    rs.status = false;
-                    rs.message = "Invalid Item Details.";
-                    return rs;
-                }
+                rs.status = true;
+                //rs = await CheckItemIssued(issueMaterial);
+                //if (!rs.status)
+                //{
+                //    rs.status = false;
+                //    rs.message = "Invalid Item Details.";
+                //    return rs;
+                //}
 
             }
             else
@@ -6407,7 +6407,7 @@ namespace ScottmenMainApi.Models.DLayer
                 else
                 {
                     rs = new();
-                    rs.message = "Failed to returned";
+                    rs.message = "Failed to returned, " + rb.message;
                 }
             }
 
@@ -6427,10 +6427,11 @@ namespace ScottmenMainApi.Models.DLayer
 
             foreach (IssuePackagingMaterial issuePackagingMaterial in issueMaterial.IssuePackagingMaterials)
             {
+                issuePackagingMaterial.quantity = issuePackagingMaterial.retunQuantity;
                 pm.Add(new MySqlParameter("@batchId", MySqlDbType.Int64) { Value = issueMaterial.batchId });
                 pm.Add(new MySqlParameter("@issueId", MySqlDbType.Int64) { Value = issuePackagingMaterial.issueId });
                 pm.Add(new MySqlParameter("@itemId", MySqlDbType.Int32) { Value = issuePackagingMaterial.itemId });
-                pm.Add(new MySqlParameter("@retunQuantity", MySqlDbType.Decimal) { Value = issuePackagingMaterial.quantity });
+                pm.Add(new MySqlParameter("@retunQuantity", MySqlDbType.Decimal) { Value = issuePackagingMaterial.retunQuantity });
                 pm.Add(new MySqlParameter("@remark", MySqlDbType.VarChar) { Value = issuePackagingMaterial.remark });
                 pm.Add(new MySqlParameter("@clientIp", MySqlDbType.String) { Value = issueMaterial.clientIp });
                 pm.Add(new MySqlParameter("@userId", MySqlDbType.Int64) { Value = issueMaterial.userId });
@@ -6438,15 +6439,29 @@ namespace ScottmenMainApi.Models.DLayer
                 if (rb.status)
                 {
                     query = @"UPDATE blendingmaterialissue SET
-                            retunQuantity=@retunQuantity,quantity=quantity+@retunQuantity,
+                            retunQuantity=retunQuantity+@retunQuantity,
                                                     balanceQuantity=balanceQuantity+@retunQuantity,
                                                     returnDate=NOW(),remark=@remark,clientIp=@clientIp,userId=@userId
-                                WHERE issueId=@issueId AND batchId=@batchId AND itemId=@itemId";
+                                WHERE issueId=@issueId AND quantity >= (balanceQuantity+@retunQuantity) ;";
                     returnBool = await db.ExecuteQueryAsync(query, pm.ToArray(), "Returnmaterialissue");
                     if (returnBool.status)
+                    {
                         returnBool = await IncreaseItems((Int32)issuePackagingMaterial.itemId!, (long)issuePackagingMaterial.quantity!);
-                    if (returnBool.status)
-                        counter++;
+                        if (returnBool.status)
+                            counter++;
+                        else
+                        {
+                            returnBool.status = false;
+                            returnBool.message = "invalid Item Details";
+                            return returnBool;
+                        }
+                    }
+                    else
+                    {
+                        returnBool.status = false;
+                        returnBool.message = "invalid return quantity";
+                        return returnBool;
+                    }
                 }
 
             }
