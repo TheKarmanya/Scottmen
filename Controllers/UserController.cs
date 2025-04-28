@@ -914,7 +914,6 @@ namespace ScottmenMainApi.Controllers
             //if (roleId == (int)UserRole.Administrator)
             //{
             return await dl.ReturnIssuedItem(issueMaterial);
-
             //}
             //else
             //    rb.message = "User not authorized to access the report";
