@@ -6362,19 +6362,13 @@ namespace ScottmenMainApi.Models.DLayer
         /// <returns></returns>
         public async Task<ReturnClass.ReturnString> ReturnIssuedItem(IssueMaterial issueMaterial)
         {
-
             ReturnClass.ReturnString rs = new();
             if (issueMaterial.IssuePackagingMaterials[0].issueId > 0)
             {
                 rs.status = true;
-                //rs = await CheckItemIssued(issueMaterial);
-                //if (!rs.status)
-                //{
-                //    rs.status = false;
-                //    rs.message = "Invalid Item Details.";
-                //    return rs;
-                //}
-
+                rs = await ValidateReturnIssuedItemAsync(issueMaterial);
+                if (!rs.status)
+                    return rs;
             }
             else
             {
@@ -6393,11 +6387,9 @@ namespace ScottmenMainApi.Models.DLayer
 
                 using (TransactionScope ts = new(TransactionScopeAsyncFlowOption.Enabled))
                 {
-
                     rb = await ReturnIssuedItemAsync(issueMaterial, 0);
                     if (rb.status)
                         ts.Complete();
-
                 }
                 if (rb.status)
                 {
@@ -6414,6 +6406,7 @@ namespace ScottmenMainApi.Models.DLayer
 
             return rs;
         }
+
         private async Task<ReturnClass.ReturnBool> ReturnIssuedItemAsync(IssueMaterial issueMaterial, int counter = 0)
         {
 
@@ -6463,9 +6456,7 @@ namespace ScottmenMainApi.Models.DLayer
                         return returnBool;
                     }
                 }
-
             }
-
             if (issueMaterial.IssuePackagingMaterials.Count == counter)
             {
                 returnBool.status = true;
@@ -6476,11 +6467,35 @@ namespace ScottmenMainApi.Models.DLayer
                 returnBool.status = false;
                 returnBool.message = "Try again, Data not updated.";
             }
-
             return returnBool;
         }
+        private async Task<ReturnClass.ReturnString> ValidateReturnIssuedItemAsync(IssueMaterial issueMaterial, int counter = 0)
+        {
 
+            string query = "";
+            ReturnString returnBool = new();
+            List<MySqlParameter> pm = new();
+            query = @"";
+            foreach (IssuePackagingMaterial issuePackagingMaterial in issueMaterial.IssuePackagingMaterials)
+            {
+                pm.Add(new MySqlParameter("@issueId", MySqlDbType.Int64) { Value = issuePackagingMaterial.issueId });
+                pm.Add(new MySqlParameter("@retunQuantity", MySqlDbType.Decimal) { Value = issuePackagingMaterial.retunQuantity });
 
+                query = @"SELECT b.issueId FROM blendingmaterialissue b                            
+                                WHERE b.issueId=@issueId AND b.quantity >= (b.balanceQuantity+@retunQuantity) ;";
+                ReturnDataTable dtvallidate = await db.ExecuteSelectQueryAsync(query, pm.ToArray());
+                if (dtvallidate.table.Rows.Count > 0)
+                    counter++;
+                else
+                {
+                    returnBool.status = false;
+                    returnBool.message = "Invalid Return Quantity.";
+                    return returnBool;
+                }
+            }
+            returnBool.status = true;
+            return returnBool;
+        }
         /// <summary>
         /// 
         /// Get Blending Process List
