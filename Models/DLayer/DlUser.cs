@@ -6376,15 +6376,9 @@ namespace ScottmenMainApi.Models.DLayer
                 rs.message = "Invalid Issue Id.";
                 return rs;
             }
-
             DlCommon dlCommon = new();
             if (rs.status)
             {
-                MySqlParameter[] pm = new MySqlParameter[] {
-
-                    new MySqlParameter("@issueId", MySqlDbType.Int64) { Value = issueMaterial.issueId}
-                };
-
                 using (TransactionScope ts = new(TransactionScopeAsyncFlowOption.Enabled))
                 {
                     rb = await ReturnIssuedItemAsync(issueMaterial, 0);
@@ -6402,8 +6396,6 @@ namespace ScottmenMainApi.Models.DLayer
                     rs.message = "Failed to returned, " + rb.message;
                 }
             }
-
-
             return rs;
         }
 
@@ -6478,14 +6470,23 @@ namespace ScottmenMainApi.Models.DLayer
             query = @"";
             foreach (IssuePackagingMaterial issuePackagingMaterial in issueMaterial.IssuePackagingMaterials)
             {
-                pm.Add(new MySqlParameter("@issueId", MySqlDbType.Int64) { Value = issuePackagingMaterial.issueId });
-                pm.Add(new MySqlParameter("@retunQuantity", MySqlDbType.Decimal) { Value = issuePackagingMaterial.retunQuantity });
+                if (issuePackagingMaterial.retunQuantity > 0)
+                {
+                    pm.Add(new MySqlParameter("@issueId", MySqlDbType.Int64) { Value = issuePackagingMaterial.issueId });
+                    pm.Add(new MySqlParameter("@retunQuantity", MySqlDbType.Decimal) { Value = issuePackagingMaterial.retunQuantity });
 
-                query = @"SELECT b.issueId FROM blendingmaterialissue b                            
+                    query = @"SELECT b.issueId FROM blendingmaterialissue b                            
                                 WHERE b.issueId=@issueId AND b.quantity >= (b.balanceQuantity+@retunQuantity) ;";
-                ReturnDataTable dtvallidate = await db.ExecuteSelectQueryAsync(query, pm.ToArray());
-                if (dtvallidate.table.Rows.Count > 0)
-                    counter++;
+                    ReturnDataTable dtvallidate = await db.ExecuteSelectQueryAsync(query, pm.ToArray());
+                    if (dtvallidate.table.Rows.Count > 0)
+                        counter++;
+                    else
+                    {
+                        returnBool.status = false;
+                        returnBool.message = "Invalid Return Quantity.";
+                        return returnBool;
+                    }
+                }
                 else
                 {
                     returnBool.status = false;
