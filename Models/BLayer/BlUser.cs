@@ -412,8 +412,8 @@ namespace ScottmenMainApi.Models.BLayer
     public class ItemStockMaster
     {
         public long? userId { get; set; } = 0;
-        public string? clientIp { get; set; }
-        public List<ItemStock> stock { get; set; }
+        public string? clientIp { get; set; } = "";
+        public List<ItemStock>? stock { get; set; }
     }
     public class ItemStock
     {
