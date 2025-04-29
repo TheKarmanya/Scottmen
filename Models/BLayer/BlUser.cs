@@ -417,24 +417,25 @@ namespace ScottmenMainApi.Models.BLayer
     }
     public class ItemStock
     {
-        public long? itemStockId { get; set; }
-        public long? unloadingId { get; set; }
-        public Int16? itemId { get; set; }
+        public long? itemStockId { get; set; } = 0;
+        public long? unloadingId { get; set; } = 0;
+        public Int16? itemId { get; set; } = 0;
         public string? itemName { get; set; }
-        public Int64? quantity { get; set; }
+        public Int64? quantity { get; set; } = 0;
         public Int64? oldQuantity { get; set; } = 0;
         public Int64? updatedQuantity { get; set; } = 0;
-        public Int16? unitId { get; set; }
-        public string? unitName { get; set; }
-        public Int16? ageing { get; set; }
-        public string? SerialNoFrom { get; set; }
-        public string? SerialNoTo { get; set; }
-        public DateTime? expiryDate { get; set; }
-        public string? remark { get; set; }
-        public decimal? amount { get; set; }
+        public Int16? unitId { get; set; } = 0;
+        public string? unitName { get; set; } = "";
+        public Int16? ageing { get; set; } = 0;
+        public string? SerialNoFrom { get; set; } = "";
+        public string? SerialNoTo { get; set; } = "";
+        public DateTime? expiryDate { get; set; } = DateTime.Now;
+        public string? remark { get; set; } = "";
+        public decimal? amount { get; set; } = 0;
         public Int16? active { get; set; } = (Int16)IsActive.Yes;
         public long? userId { get; set; } = 0;
-        public string? clientIp { get; set; }
+        public string? clientIp { get; set; } = "";
+        
 
     }
     public class ItemStockSearch
@@ -488,7 +489,7 @@ namespace ScottmenMainApi.Models.BLayer
 
     public class IssueMaterial
     {
-        public long? issueId { get; set; }
+        public long? issueId { get; set; } = 0;
         public long? batchId { get; set; }
 
         public DateTime? issueDate { get; set; }
