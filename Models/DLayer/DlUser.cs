@@ -6064,7 +6064,7 @@ namespace ScottmenMainApi.Models.DLayer
                             bm.startDate,
                             bm.endDate,bm.emptyDate
                              FROM blendingmaster bm 
-                            WHERE bm.active=@active " + WHERE;
+                            WHERE bm.active=@active " + WHERE + "  ORDER BY bm.batchId DESC ";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             ds.status = true;
             if (dt.table.Rows.Count > 0)
@@ -6425,9 +6425,10 @@ namespace ScottmenMainApi.Models.DLayer
                 {
                     query = @"UPDATE blendingmaterialissue SET
                             retunQuantity=retunQuantity+@retunQuantity,
-                                                    balanceQuantity=balanceQuantity+@retunQuantity,
-                                                    returnDate=NOW(),remark=@remark,clientIp=@clientIp,userId=@userId
-                                WHERE issueId=@issueId AND quantity >= (balanceQuantity+@retunQuantity) ;";
+                                                    balanceQuantity=balanceQuantity-@retunQuantity,
+                                                    returnDate=NOW(),remark=@remark,clientIp=@clientIp,
+                                                    userId=@userId
+                                WHERE issueId=@issueId AND balanceQuantity >=@retunQuantity ;";
                     returnBool = await db.ExecuteQueryAsync(query, pm.ToArray(), "Returnmaterialissue");
                     if (returnBool.status)
                     {
@@ -6449,7 +6450,7 @@ namespace ScottmenMainApi.Models.DLayer
                     }
                 }
             }
-            if (issueMaterial.IssuePackagingMaterials.Count == counter)
+            if (returnBool.status)
             {
                 returnBool.status = true;
                 returnBool.message = "Item has been returned Successfully.";
@@ -6466,17 +6467,18 @@ namespace ScottmenMainApi.Models.DLayer
 
             string query = "";
             ReturnString returnBool = new();
-            List<MySqlParameter> pm = new();
+
             query = @"";
             foreach (IssuePackagingMaterial issuePackagingMaterial in issueMaterial.IssuePackagingMaterials)
             {
                 if (issuePackagingMaterial.retunQuantity > 0)
                 {
+                    List<MySqlParameter> pm = new();
                     pm.Add(new MySqlParameter("@issueId", MySqlDbType.Int64) { Value = issuePackagingMaterial.issueId });
                     pm.Add(new MySqlParameter("@retunQuantity", MySqlDbType.Decimal) { Value = issuePackagingMaterial.retunQuantity });
 
                     query = @"SELECT b.issueId FROM blendingmaterialissue b                            
-                                WHERE b.issueId=@issueId AND b.quantity >= (b.balanceQuantity+@retunQuantity) ;";
+                                WHERE b.issueId=@issueId AND b.balanceQuantity >= @retunQuantity;";
                     ReturnDataTable dtvallidate = await db.ExecuteSelectQueryAsync(query, pm.ToArray());
                     if (dtvallidate.table.Rows.Count > 0)
                         counter++;
@@ -6534,7 +6536,7 @@ namespace ScottmenMainApi.Models.DLayer
                         bmi.unitId,bmi.unitName,DATE_FORMAT(bmi.issueDate,'%d/%m/%Y') AS issueDate,bmi.remark
                          FROM blendingmaster b 
                         JOIN blendingmaterialissue bmi ON bmi.batchId=b.batchId
-                        WHERE b.active=@active " + WHERE;
+                        WHERE b.active=@active " + WHERE + "  ORDER BY bmi.issueId DESC ";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             ds.status = true;
 
@@ -6892,7 +6894,7 @@ namespace ScottmenMainApi.Models.DLayer
 				fp.unitName,fp.remark,fp.stockDate,fp.lastIssueDate 
 				FROM finishedproduct fp 
 				JOIN blendingmaster b ON b.batchId=fp.batchId				
-				WHERE fp.active=@active " + WHERE;
+				WHERE fp.active=@active " + WHERE + "  ORDER BY fp.productId DESC ";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             ds.status = true;
             if (dt.table.Rows.Count > 0)
@@ -6904,7 +6906,7 @@ namespace ScottmenMainApi.Models.DLayer
                          fm.unitId,fm.unitName,fm.remark 
                     FROM finishedproducmaster fm JOIN
                     finishedproduct fp ON fp.batchId = fm.batchId AND fm.brandId = fp.brandId			
-				WHERE fp.active=@active " + WHERE;
+				WHERE fp.active=@active " + WHERE + "  ORDER BY fm.brandName "; ;
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             ds.status = true;
             if (dt.table.Rows.Count > 0)
