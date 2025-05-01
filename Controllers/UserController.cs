@@ -820,11 +820,11 @@ namespace ScottmenMainApi.Controllers
         }
         [HttpPost("addstock")]
         // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<ReturnString> SaveRowMaterialInStock([FromBody] ItemStockMaster itemStock)
+        public async Task<ReturnString> SaveRowMaterialInStock([FromBody] List<ItemStock> itemStock)
         {
-            itemStock.userId = itemStock.userId == null ? 0 : itemStock.userId;//Convert.ToInt64(User.FindFirst("userId")?.Value);
+            itemStock[0].userId = itemStock[0].userId == null ? 0 : itemStock[0].userId;//Convert.ToInt64(User.FindFirst("userId")?.Value);
                                                                                // itemStock[0].roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
-            itemStock.clientIp = itemStock.clientIp == null ? "" : Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            itemStock[0].clientIp = itemStock[0].clientIp == null ? "" : Utilities.GetRemoteIPAddress(this.HttpContext, true);
             // ReturnString rs = new();
             //if (roleId == (int)UserRole.Administrator)
             //{

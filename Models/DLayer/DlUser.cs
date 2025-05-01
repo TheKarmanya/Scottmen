@@ -5448,10 +5448,10 @@ namespace ScottmenMainApi.Models.DLayer
         /// </summary>
         /// <param name="itemStock"></param>
         /// <returns></returns>
-        public async Task<ReturnClass.ReturnString> SaveRowMaterialInStock(ItemStockMaster itemStock)
+        public async Task<ReturnClass.ReturnString> SaveRowMaterialInStock(List<ItemStock> itemStock)
         {
             bool isItemExistsInStock = false;
-            ReturnClass.ReturnString rs = await ItemExistsInStock((long)itemStock.stock[0].unloadingId);
+            ReturnClass.ReturnString rs = await ItemExistsInStock((long)itemStock[0].unloadingId);
             isItemExistsInStock = rs.status;
 
             rs = await GenerateItemStockId();
@@ -5465,7 +5465,7 @@ namespace ScottmenMainApi.Models.DLayer
             {
                 MySqlParameter[] pm = new MySqlParameter[] {
 
-                    new MySqlParameter("@unloadingId", MySqlDbType.Int64) { Value = itemStock.stock[0].unloadingId}
+                    new MySqlParameter("@unloadingId", MySqlDbType.Int64) { Value = itemStock[0].unloadingId}
                 };
 
                 if (isItemExistsInStock)
@@ -5493,7 +5493,7 @@ namespace ScottmenMainApi.Models.DLayer
                         rb.status = true;
                     if (rb.status)
                     {
-                        rb = await AddItemInStockAsync(itemStock.stock, ItemStockId, isItemExistsInStock, 1);
+                        rb = await AddItemInStockAsync(itemStock, ItemStockId, isItemExistsInStock, 1);
                         if (rb.status)
                             ts.Complete();
                     }
