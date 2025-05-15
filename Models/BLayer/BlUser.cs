@@ -435,7 +435,7 @@ namespace ScottmenMainApi.Models.BLayer
         public Int16? active { get; set; } = (Int16)IsActive.Yes;
         public long? userId { get; set; } = 0;
         public string? clientIp { get; set; } = "";
-        
+
 
     }
     public class ItemStockSearch
@@ -573,6 +573,17 @@ namespace ScottmenMainApi.Models.BLayer
 
     public class DispatchDetail
     {
+        public long? batchId { get; set; }
+        public Int32? brandId { get; set; }
+        public string? brandName { get; set; }
+        public decimal? quantity { get; set; }
+        public Int16? unitId { get; set; }
+        public string? unitName { get; set; }
+    }
+    public class DispatchSearch
+    {
+        public long? dispatchId { get; set; }
+        public long? loadingId { get; set; }
         public long? batchId { get; set; }
         public Int32? brandId { get; set; }
         public string? brandName { get; set; }

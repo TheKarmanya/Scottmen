@@ -823,7 +823,7 @@ namespace ScottmenMainApi.Controllers
         public async Task<ReturnString> SaveRowMaterialInStock([FromBody] List<ItemStock> itemStock)
         {
             itemStock[0].userId = itemStock[0].userId == null ? 0 : itemStock[0].userId;//Convert.ToInt64(User.FindFirst("userId")?.Value);
-                                                                               // itemStock[0].roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+                                                                                        // itemStock[0].roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
             itemStock[0].clientIp = itemStock[0].clientIp == null ? "" : Utilities.GetRemoteIPAddress(this.HttpContext, true);
             // ReturnString rs = new();
             //if (roleId == (int)UserRole.Administrator)
@@ -964,6 +964,39 @@ namespace ScottmenMainApi.Controllers
             //if (roleId == (int)UserRole.Administrator)
             //{
             return await dl.GetFinishedProductList(finishedProduct);
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+
+        [HttpPost("savedispatch")]
+        // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnString> SaveDispatch([FromBody] Dispatch dispatch)
+        {
+            dispatch.userId = 0;//Convert.ToInt64(User.FindFirst("userId")?.Value);
+                                // itemStock[0].roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            dispatch.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+
+            return await dl.SaveDispatch(dispatch);
+
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+        [HttpPost("dispatchlist")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnDataSet> GetDispatchListList(DispatchSearch dispatch)
+        {
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            return await dl.GetDispatchList(dispatch);
             //}
             //else
             //    rb.message = "User not authorized to access the report";

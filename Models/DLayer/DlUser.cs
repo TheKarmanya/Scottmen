@@ -7139,54 +7139,59 @@ namespace ScottmenMainApi.Models.DLayer
         /// Get Dispatch List
         /// </summary>
         /// <returns></returns>
-        //public async Task<ReturnDataSet> GetDispatchList(Dispatch dispatch)
-        //{
-        //    string query = "";
-        //    ReturnDataSet ds = new();
-        //    dispatch.batchId = dispatch.batchId == null ? 0 : dispatch.batchId;
+        public async Task<ReturnDataSet> GetDispatchList(DispatchSearch dispatch)
+        {
+            string query = "";
+            ReturnDataSet ds = new();
+            dispatch.batchId = dispatch.batchId == null ? 0 : dispatch.batchId;
 
-        //    dispatch.brandId = dispatch.brandId == null ? 0 : dispatch.brandId;
-        //    dispatch.active = dispatch.active == null ? 1 : dispatch.active;
+            dispatch.brandId = dispatch.brandId == null ? 0 : dispatch.brandId;
+           // dispatch.active = dispatch.active == null ? 1 : dispatch.active;
 
-        //    MySqlParameter[] pm = new MySqlParameter[]
-        //   {
-        //       new MySqlParameter("batchId", MySqlDbType.Int64) { Value = dispatch.batchId},
+            MySqlParameter[] pm = new MySqlParameter[]
+           {
+               new MySqlParameter("batchId", MySqlDbType.Int64) { Value = dispatch.batchId},
 
-        //       new MySqlParameter("brandId", MySqlDbType.Int64) { Value = dispatch.brandId},
-        //       //new MySqlParameter("stockDate", MySqlDbType.DateTime) { Value = dispatch.stockDate},
-        //       //new MySqlParameter("lastIssueDate", MySqlDbType.DateTime) { Value = dispatch.lastIssueDate},
-        //       new MySqlParameter("active", MySqlDbType.Int16) { Value = dispatch.active},
-
-
-        //   };
-        //    String WHERE = "";
-
-        //    if (dispatch.batchId > 0)
-        //        WHERE += @" AND fp.batchId=@batchId ";
-        //    if (dispatch.batchId > 0)
-        //        WHERE += @" AND fp.batchId=@batchId ";
-
-        //    //if (dispatch. != null)
-        //    //    WHERE += @" AND DATE_FORMAT(fp.stockDate,'%d/%m/%Y')=DATE_FORMAT(@stockDate,'%d/%m/%Y')";
-        //    //if (dispatch.lastIssueDate != null)
-        //    //    WHERE += @" AND DATE_FORMAT(fp.lastIssueDate,'%d/%m/%Y')=DATE_FORMAT(@lastIssueDate,'%d/%m/%Y')";
+               new MySqlParameter("brandId", MySqlDbType.Int64) { Value = dispatch.brandId},
+               //new MySqlParameter("stockDate", MySqlDbType.DateTime) { Value = dispatch.stockDate},
+               //new MySqlParameter("lastIssueDate", MySqlDbType.DateTime) { Value = dispatch.lastIssueDate},
+               new MySqlParameter("active", MySqlDbType.Int16) { Value = (Int16)YesNo.Yes},
 
 
-        //    query = @"SELECT fp.productId,fp.batchId,fp.brandId,fp.brandName,
-        //fp.totalQuantity,fp.balanceQuantity,fp.unitId,
-        //	fp.unitName,fp.remark,fp.stockDate,fp.lastIssueDate 
-        //	FROM dispatch fp 
-        //	JOIN blendingmaster b ON b.batchId=fp.batchId				
-        //	WHERE fp.active=@active " + WHERE;
-        //    dt = await db.ExecuteSelectQueryAsync(query, pm);
-        //    if (dt.table.Rows.Count > 0)
-        //    {
-        //        ds.status = true;
-        //        ds.dataset.Tables.Add(dt.table);
+           };
+            String WHERE = "";
+            if (dispatch.dispatchId > 0)
+                WHERE += @" AND d.dispatchId=@dispatchId ";
+            if (dispatch.batchId > 0)
+                WHERE += @" AND d.batchId=@batchId ";
+            if (dispatch.batchId > 0)
+                WHERE += @" AND d.batchId=@batchId ";
+            if (dispatch.loadingId > 0)
+                WHERE += @" AND dm.loadingId=@loadingId ";
 
-        //    }
-        //    return ds;
-        //}
+            //if (dispatch. != null)
+            //    WHERE += @" AND DATE_FORMAT(fp.stockDate,'%d/%m/%Y')=DATE_FORMAT(@stockDate,'%d/%m/%Y')";
+            //if (dispatch.lastIssueDate != null)
+            //    WHERE += @" AND DATE_FORMAT(fp.lastIssueDate,'%d/%m/%Y')=DATE_FORMAT(@lastIssueDate,'%d/%m/%Y')";
+
+
+            query = @"SELECT d.dispatchId,d.batchId,d.brandId,d.brandName,
+							d.quantity,d.unitId,d.unitName,b.balanceQuantity,
+                        DATE_FORMAT(dm.creationTimeStamp ,'%d/%m/%Y') as dispatchDate,
+                        dm.loadingId,dm.billTNo
+        	FROM dispatch d 
+            JOIN dispatchmaster dm ON d.dispatchId=dm.dispatchId
+        	JOIN finishedproducmaster b ON b.batchId=d.batchId AND b.brandId=d.brandId				
+        	WHERE d.active=@active " + WHERE + " ORDER BY d.dispatchId DESC";
+            dt = await db.ExecuteSelectQueryAsync(query, pm);
+            if (dt.table.Rows.Count > 0)
+            {
+                ds.status = true;
+                ds.dataset.Tables.Add(dt.table);
+
+            }
+            return ds;
+        }
 
         #endregion
 
