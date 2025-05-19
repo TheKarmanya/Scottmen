@@ -30,7 +30,7 @@ namespace ScottmenMainApi.Models.DLayer
         #region Industrial Profile Registration
         /// <summary>
         /// Register New Industrial User
-        /// </summary>
+        /// </summary> s
         /// <param name="bl"></param>
         /// <returns></returns>
         public async Task<ReturnClass.ReturnString> RegisterIndustrialUserAsync(BlUser bl)
