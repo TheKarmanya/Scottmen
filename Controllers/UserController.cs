@@ -835,6 +835,23 @@ namespace ScottmenMainApi.Controllers
             //else
             //    rb.message = "User not authorized to access the report";
         }
+        [HttpPost("removestock")]
+        // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnBool> removeRowMaterialInStock([FromBody] ItemStock itemStock)
+        {
+            itemStock.userId = itemStock.userId == null ? 0 : itemStock.userId;//Convert.ToInt64(User.FindFirst("userId")?.Value);
+                                                                               // itemStock[0].roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            itemStock.clientIp = itemStock.clientIp == null ? "" : Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+
+            return await dl.RemoveItemfromStockAsync((long)itemStock.itemStockId!);
+
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
 
         [HttpPost("stocklist")]
         //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -869,6 +886,23 @@ namespace ScottmenMainApi.Controllers
             //else
             //    rb.message = "User not authorized to access the report";
         }
+        [HttpPost("removeblendingprocess")]
+        // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnBool> removeBlendingProcessAsync([FromBody] RemobeBlendingProcess blending)
+        {
+            blending.userId = blending.userId == null ? 0 : blending.userId;//Convert.ToInt64(User.FindFirst("userId")?.Value);
+                                                                            // itemStock[0].roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            blending.clientIp = blending.clientIp == null ? "" : Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+
+            return await dl.RemoveItemfromBlendingProcess((long)blending.batchId!, (Int16)blending.itemId!);
+
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
 
         [HttpPost("blendingprocesslist")]
         //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -898,6 +932,24 @@ namespace ScottmenMainApi.Controllers
             //{
 
             return await dl.IssuePackagingMaterial(issueMaterial);
+
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+
+        [HttpPost("removeissuepackageitems")]
+        // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnBool> removeBlendingProcessAsync([FromBody] RemoveIssueMaterial issueMaterial)
+        {
+            issueMaterial.userId = issueMaterial.userId == null ? 0 : issueMaterial.userId;//Convert.ToInt64(User.FindFirst("userId")?.Value);
+                                                                                           // itemStock[0].roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            issueMaterial.clientIp = issueMaterial.clientIp == null ? "" : Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+
+            return await dl.RemoveItemfromIssuedItem((long)issueMaterial.issueId!, (Int16)issueMaterial.itemId!);
 
             //}
             //else
@@ -953,6 +1005,7 @@ namespace ScottmenMainApi.Controllers
             //    rb.message = "User not authorized to access the report";
         }
 
+
         [HttpPost("finishedproductlist")]
         //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ReturnDataSet> GetFinishedProductList(FinishedProduct finishedProduct)
@@ -997,6 +1050,37 @@ namespace ScottmenMainApi.Controllers
             //if (roleId == (int)UserRole.Administrator)
             //{
             return await dl.GetDispatchList(dispatch);
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+
+        [HttpPost("savewastedetails")]
+        // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnString> SaveWasteDetails([FromBody] WasteDetail wasteDetail)
+        {
+            wasteDetail.userId = 0;//Convert.ToInt64(User.FindFirst("userId")?.Value);
+                                   // itemStock[0].roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            wasteDetail.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            return await dl.SaveWasteDetail(wasteDetail);
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+        [HttpPost("wastelist")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnDataSet> GetWasteList(WasteDetail wasteDetail)
+        {
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            return await dl.GetWasteList(wasteDetail);
             //}
             //else
             //    rb.message = "User not authorized to access the report";

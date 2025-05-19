@@ -215,9 +215,16 @@ namespace BaseClass
     }
     public enum WasteCategory
     {
-        Blending = 1,
-        Packaging = 2,
+        Items = 1,
+        Blending = 2,        
         Dispatch = 3,
+
+    }
+    public enum BrandCategory
+    {
+        Small = 1,
+        Medium = 2,
+        Large = 3,
 
     }
 }
