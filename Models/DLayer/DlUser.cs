@@ -4371,16 +4371,17 @@ namespace ScottmenMainApi.Models.DLayer
         {
 
             DlCommon dlCommon = new();
-            string query = @"INSERT INTO brandmaster (brandName,brandNameHindi,active,userId,
+            string query = @"INSERT INTO brandmaster (brandName,brandNameHindi,brandCategory,active,userId,
                                                 clientIp) 
 										  VALUES
-										  (@brandName,@brandNameHindi,@active,@userId,
+										  (@brandName,@brandNameHindi,@brandCategory,@active,@userId,
                                                 @clientIp)";
 
             MySqlParameter[] pm = new MySqlParameter[] {
                   //  new MySqlParameter("@brandId", MySqlDbType.Int32) { Value = bl.brandId},
                     new MySqlParameter("@brandName", MySqlDbType.VarChar) { Value = bl.brandName},
                     new MySqlParameter("@brandNameHindi", MySqlDbType.String) { Value = bl.brandNameHindi},
+                    new MySqlParameter("@brandCategory", MySqlDbType.Int16) { Value = bl.brandCategory},
                     new MySqlParameter("@active", MySqlDbType.Int16) { Value = bl.active},
                      new MySqlParameter("@userId", MySqlDbType.Int64) { Value = bl.userId},
                       new MySqlParameter("@clientIp", MySqlDbType.String) { Value = bl.clientIp},
@@ -4415,6 +4416,7 @@ namespace ScottmenMainApi.Models.DLayer
                     new MySqlParameter("@brandId", MySqlDbType.Int32) { Value = bl.brandId},
                     new MySqlParameter("@brandName", MySqlDbType.VarChar) { Value = bl.brandName},
                     new MySqlParameter("@brandNameHindi", MySqlDbType.String) { Value = bl.brandNameHindi},
+                     new MySqlParameter("@brandCategory", MySqlDbType.Int16) { Value = bl.brandCategory},
                     new MySqlParameter("@active", MySqlDbType.Int16) { Value = bl.active},
                      new MySqlParameter("@userId", MySqlDbType.Int64) { Value = bl.userId},
                       new MySqlParameter("@clientIp", MySqlDbType.String) { Value = bl.clientIp},
@@ -4433,6 +4435,7 @@ namespace ScottmenMainApi.Models.DLayer
                 {
                     query = @"UPDATE brandmaster SET  
                                       brandName=@brandName,brandNameHindi=@brandNameHindi,
+                                      brandCategory=@brandCategory,
                                       active=@active,userId=@userId,clientIp=@clientIp
                                       WHERE brandId=@brandId;";
                     rb = await db.ExecuteQueryAsync(query, pm, "Updatebrand");
@@ -4465,7 +4468,7 @@ namespace ScottmenMainApi.Models.DLayer
                 new MySqlParameter("brandId", MySqlDbType.Int64) { Value = brandId},
                 new MySqlParameter("active", MySqlDbType.Int16) { Value = active},
            };
-            query = @"SELECT u.brandId,u.brandName,u.brandNameHindi FROM brandmaster  u
+            query = @"SELECT u.brandId,u.brandName,u.brandNameHindi,u.brandCategory FROM brandmaster  u
                                   WHERE  u.active=@active";
             if (brandId != 0)
                 query += @" AND u.brandId=@brandId  ";
@@ -7192,203 +7195,76 @@ namespace ScottmenMainApi.Models.DLayer
         }
         #endregion
 
-        /*
+
         #region Waste Manegement
 
         /// <summary>
-        /// Save Issue Packaging Material
+        /// Save Waste Detail
         /// </summary>
-        /// <param name="issueMaterial"></param>
+        /// <param name="wasteDetail"></param>
         /// <returns></returns>
-        public async Task<ReturnClass.ReturnString> SaveWasteDetail(WasteDetail wasteDetail )
+        public async Task<ReturnClass.ReturnString> SaveWasteDetail(WasteDetail wasteDetail)
         {
-            bool isBlendingProcessExistsI = false;
             ReturnClass.ReturnString rs = new();
-          
-          
-          
             DlCommon dlCommon = new();
-
-            MySqlParameter[] pm = new MySqlParameter[] {
-
-                    new MySqlParameter("@dispatchId", MySqlDbType.Int64) { Value = dispatch.dispatchId}
-                };
-            string query = @"INSERT INTO dispatchmasterlog
-                                    SELECT * FROM dispatchmaster b
-                                    WHERE b.dispatchId = @dispatchId; ";
             using (TransactionScope ts = new(TransactionScopeAsyncFlowOption.Enabled))
             {
-                if (isBlendingProcessExistsI)
+                rb = await AddWasteItem(wasteDetail);
+
+                if (rb.status)
                 {
-                    rb = await db.ExecuteQueryAsync(query, pm, "SavedispatchIdmasterlog");
+                    if (wasteDetail.wasteCategoryId == (Int16)WasteCategory.Items)
+                        rb = await wastageItemfromStockAsync((long)wasteDetail.itemStockId!);
+                    else if (wasteDetail.wasteCategoryId == (Int16)WasteCategory.Blending)
+                        rb = await wastageItemfromBlendingProcess((long)wasteDetail.batchId!, (Int32)wasteDetail.itemId!);
+                    else if (wasteDetail.wasteCategoryId == (Int16)WasteCategory.Dispatch)
+                        rb = await wastageInFinalProductDuringDispatch((long)wasteDetail.batchId!, (Int32)wasteDetail.brandId!, (Int64)wasteDetail.quantity!);
                     if (rb.status)
                     {
-                        query = @"DELETE FROM dispatchIdmaster 
-                                    WHERE dispatchId = @dispatchId; ";
-                        rb = await db.ExecuteQueryAsync(query, pm, "Deleteblendingmaster");
-                        if (rb.status)
-                        {
-                            query = @"INSERT INTO dispatchdetaillog
-                                    SELECT * FROM dispatchdetail b
-                                    WHERE b.dispatchId = @dispatchId; ";
-                            rb = await db.ExecuteQueryAsync(query, pm, "Insertblendingitemlog");
-                            if (rb.status)
-                            {
-                                query = @"DELETE FROM dispatchdetail 
-                                    WHERE dispatchId = @dispatchId; ";
-                                rb = await db.ExecuteQueryAsync(query, pm, "Deleteblendingitem");
-                            }
-                        }
+                        ts.Complete();
+                        rs.status = true;
+                        rs.message = "Waste Details Saved ";
                     }
                 }
                 else
-                    rb.status = true;
-                if (rb.status)
                 {
-                    rb = await AddDispatchItem(dispatch, isBlendingProcessExistsI, 1);
-                    if (rb.status)
-                        ts.Complete();
+                    rs = new();
+                    rs.message = "Failed to Save Waste Details";
                 }
             }
-            if (rb.status)
-            {
-                rs.status = true;
-                rs.message = "Product has been Dispatched ";
-            }
-            else
-            {
-                rs = new();
-                rs.message = "Failed to Dispatched Product";
-            }
-
 
 
             return rs;
         }
-        private async Task<ReturnClass.ReturnString> DispatchExists(Int64 batchId, Int32 brandId, Int64 loadingId)
+
+        private async Task<ReturnClass.ReturnBool> AddWasteItem(WasteDetail wasteDetail)
         {
-            ReturnClass.ReturnString rs = new();
-            string query = @"SELECT e.batchId,dispatchId,quantity
-                             FROM dispatchdetail e 
-                                WHERE  
-                                e.batchId = @batchId AND e.brandId=@brandId  
-                                        AND loadingId=@loadingId;";
-            MySqlParameter[] pm = new MySqlParameter[] {
-
-                    new MySqlParameter("@batchId", MySqlDbType.Int64) { Value = batchId},
-                    new MySqlParameter("@loadingId", MySqlDbType.Int64) { Value = loadingId},
-                    new MySqlParameter("@brandId", MySqlDbType.Int32) { Value = brandId}
-                };
-            dt = await db.ExecuteSelectQueryAsync(query, pm);
-            rs.status = false;
-            if (dt.table.Rows.Count > 0)
-            {
-                rs.status = true;
-                rs.message = "Blending Process Exists";
-            }
-            return rs;
-        }
-
-        /// <summary>
-        /// Returns Generate Dispatch ID 7+DDMM + NNN NN
-        /// </summary>
-        /// <returns></returns>
-        private async Task<ReturnClass.ReturnString> GenerateDispatchID()
-        {
-            ReturnClass.ReturnString rs = new();
-            string query = @"SELECT IFNULL(MAX(SUBSTRING(e.dispatchId,6,10)),0) + 1 AS  dispatchId
-                             FROM dispatchdetail e 
-                                WHERE  
-                                DATE_FORMAT(e.creationTimeStamp,'%d/%m/%Y') = DATE_FORMAT(NOW(),'%d/%m/%Y');";
-
-            dt = await db.ExecuteSelectQueryAsync(query);
-            if (dt.table.Rows.Count > 0)
-            {
-
-                string id = ((int)PrefixId.Dispatch).ToString() + DateTime.Now.ToString("yyMM") + dt.table.Rows[0]["dispatchId"].ToString()!.PadLeft(5, '0');
-                rs.id = Convert.ToInt64(id);
-                rs.status = true;
-            }
-            return rs;
-        }
-        private async Task<ReturnClass.ReturnBool> AddDispatchItem(Dispatch dispatch, bool isfinishedProductExists, int counter = 0)
-        {
-
-            ReturnString rs1 = new();
             string query = "";
-            string query1 = "";
-            string billTNo = "SF" + dispatch.dispatchId.ToString();
             List<MySqlParameter> pm1 = new();
-            query = @"INSERT INTO dispatchmaster (dispatchId,loadingId,	quantity,remark,
-                                                billTNo,active,clientIp,userId) 
+            query = @"INSERT INTO wastedetail (wasteCategoryId,wasteCategory,quantity,remark,
+                                                brandId,brandName,batchId,itemId,itemName,itemStockId,
+                                                active,clientIp,userId) 
                                                 VALUES 
-                                    (@dispatchId,@loadingId,@quantity,@remark,
-                                                @billTNo,@active,@clientIp,@userId)";
-
+                                    (@wasteCategoryId,@wasteCategory,@quantity,@remark,
+                                                @brandId,@brandName,@batchId,@itemId,@itemName,@itemStockId,
+                                                @active,@clientIp,@userId)";
             MySqlParameter[] pm = new MySqlParameter[] {
-              new MySqlParameter("@dispatchId", MySqlDbType.Int64) { Value = dispatch.dispatchId},
-              new MySqlParameter("@loadingId", MySqlDbType.Int64) { Value = dispatch.loadingId},
-              new MySqlParameter("@quantity", MySqlDbType.Decimal) { Value = dispatch.quantity},
-              //new MySqlParameter("@unitId"+counter.ToString(), MySqlDbType.Int16) { Value = dispatch.unitId},
-             // new MySqlParameter("@unitName"+counter.ToString(), MySqlDbType.VarChar) { Value = dispatch.unitName},
-              new MySqlParameter("@remark", MySqlDbType.VarChar) { Value = dispatch.remark},
-              new MySqlParameter("@billTNo", MySqlDbType.VarChar) { Value =billTNo},
+              new MySqlParameter("@wasteCategoryId", MySqlDbType.Int64) { Value = wasteDetail.wasteCategoryId},
+              new MySqlParameter("@wasteCategory", MySqlDbType.Int64) { Value = wasteDetail.wasteCategory},
+              new MySqlParameter("@quantity", MySqlDbType.Decimal) { Value = wasteDetail.quantity},
+               new MySqlParameter("@brandId", MySqlDbType.Int32) { Value =wasteDetail.brandId},
+              new MySqlParameter("@brandName", MySqlDbType.VarChar) { Value = wasteDetail.brandName},
+               new MySqlParameter("@batchId", MySqlDbType.Int64) { Value =wasteDetail.batchId},
+                new MySqlParameter("@itemId", MySqlDbType.Int32) { Value =wasteDetail.itemId},
+              new MySqlParameter("@itemName", MySqlDbType.VarChar) { Value = wasteDetail.itemName},
+               new MySqlParameter("@itemStockId", MySqlDbType.Int64) { Value =wasteDetail.itemStockId},
+              new MySqlParameter("@remark", MySqlDbType.VarChar) { Value = wasteDetail.remark},
               new MySqlParameter("@active", MySqlDbType.Int16) { Value =( Int16)IsActive.Yes},
-               new MySqlParameter("@userId", MySqlDbType.Int64) { Value = dispatch.userId},
-                new MySqlParameter("@clientIp", MySqlDbType.String) { Value = dispatch.clientIp},
+               new MySqlParameter("@userId", MySqlDbType.Int64) { Value = wasteDetail.userId},
+                new MySqlParameter("@clientIp", MySqlDbType.String) { Value = wasteDetail.clientIp},
                 };
+            rb = await db.ExecuteQueryAsync(query, pm, "insertwastedetail");
 
-            query1 = @"INSERT INTO dispatchdetail (dispatchId,batchId,brandId,brandName,
-							                        quantity,unitId,unitName,active,clientIp,userId) 
-                                                VALUES ";
-            foreach (DispatchDetail dispatchDetail in dispatch.dispatchDetails)
-            {
-                //dt = await GetFinishedProductMasterData((long)dispatchDetail.batchId!, (long)dispatchDetail.brandId!);
-                //if (dt.table.Rows.Count == 0)
-                //{
-                //    rs.status = false;
-                //    rs.message = "Stock Not Available.";
-                //    return rs;
-                //}
-                //else
-                //{
-                //    if ((long)dispatchDetail.quantity! > Convert.ToDecimal(dt.table.Rows[0]["balanceQuantity"].ToString()))
-                //    {
-                //        rs.status = false;
-                //        rs.message = "quantity not Available in Stock.";
-                //        return rs;
-                //    }
-                //}
-                pm1.Add(new MySqlParameter("@dispatchId" + counter.ToString(), MySqlDbType.Int64) { Value = dispatch.dispatchId });
-                pm1.Add(new MySqlParameter("@batchId" + counter.ToString(), MySqlDbType.Int64) { Value = dispatchDetail.batchId });
-
-                pm1.Add(new MySqlParameter("@brandId" + counter.ToString(), MySqlDbType.Int64) { Value = dispatchDetail.brandId });
-                pm1.Add(new MySqlParameter("@brandName" + counter.ToString(), MySqlDbType.VarChar) { Value = dispatchDetail.brandName });
-                pm1.Add(new MySqlParameter("@quantity" + counter.ToString(), MySqlDbType.Decimal) { Value = dispatchDetail.quantity });
-                pm1.Add(new MySqlParameter("@unitId" + counter.ToString(), MySqlDbType.Int16) { Value = dispatchDetail.unitId });
-                pm1.Add(new MySqlParameter("@unitName" + counter.ToString(), MySqlDbType.VarChar) { Value = dispatchDetail.unitName });
-                pm1.Add(new MySqlParameter("@active" + counter.ToString(), MySqlDbType.Int16) { Value = (Int16)IsActive.Yes });
-                pm1.Add(new MySqlParameter("@userId" + counter.ToString(), MySqlDbType.Int64) { Value = dispatch.userId });
-                pm1.Add(new MySqlParameter("@clientIp" + counter.ToString(), MySqlDbType.String) { Value = dispatch.clientIp });
-
-                query1 += @"(@dispatchId" + counter.ToString() + @",@batchId" + counter.ToString() + @",@brandId" + counter.ToString() +
-                            @",@brandName" + counter.ToString() + @",@quantity" + counter.ToString()
-                            + @",@unitId" + counter.ToString() + @",@unitName" + counter.ToString() +
-                            @",@active" + counter.ToString() + @",@clientIp" + counter.ToString() + @",@userId" + counter.ToString() + @"),";
-
-                rb = await DecreaseFinalProduct((long)dispatchDetail.batchId!, (long)dispatchDetail.brandId, (long)dispatchDetail.quantity);
-                if (!rb.status)
-                {
-                    rb.status = false;
-                    rb.message = "Something Went Wrong";
-                    return rb;
-                }
-                counter++;
-            }
-            query1 = query1.TrimEnd(',');
-            rb = await db.ExecuteQueryAsync(query, pm, "insertdispatchMaster");
-            if (rb.status)
-                rb = await db.ExecuteQueryAsync(query1, pm1.ToArray(), "insertdispatchdetail");
             return rb;
         }
         /// <summary>
@@ -7396,21 +7272,26 @@ namespace ScottmenMainApi.Models.DLayer
         /// Get Dispatch List
         /// </summary>
         /// <returns></returns>
-        public async Task<ReturnDataSet> GetDispatchList(DispatchSearch dispatch)
+        public async Task<ReturnDataSet> GetWasteList(WasteDetail WasteDetail)
         {
             string query = "";
             ReturnDataSet ds = new();
-            dispatch.batchId = dispatch.batchId == null ? 0 : dispatch.batchId;
+            WasteDetail.batchId = WasteDetail.batchId == null ? 0 : WasteDetail.batchId;
+            WasteDetail.brandId = WasteDetail.brandId == null ? 0 : WasteDetail.brandId;
+            WasteDetail.itemId = WasteDetail.itemId == null ? 0 : WasteDetail.itemId;
+            WasteDetail.itemStockId = WasteDetail.itemStockId == null ? 0 : WasteDetail.itemStockId;
+            WasteDetail.brandId = WasteDetail.brandId == null ? 0 : WasteDetail.brandId;
 
-            dispatch.brandId = dispatch.brandId == null ? 0 : dispatch.brandId;
-            // dispatch.active = dispatch.active == null ? 1 : dispatch.active;
 
             MySqlParameter[] pm = new MySqlParameter[]
            {
-               '
-               'new MySqlParameter("batchId", MySqlDbType.Int64) { Value = dispatch.batchId},
 
-               new MySqlParameter("brandId", MySqlDbType.Int64) { Value = dispatch.brandId},
+
+               new MySqlParameter("wasteCategoryId", MySqlDbType.Int16) { Value = WasteDetail.wasteCategoryId},
+               new MySqlParameter("brandId", MySqlDbType.Int64) { Value = WasteDetail.brandId},
+               new MySqlParameter("itemId", MySqlDbType.Int64) { Value = WasteDetail.itemId},
+               new MySqlParameter("itemStockId", MySqlDbType.Int64) { Value = WasteDetail.itemStockId},
+               new MySqlParameter("batchId", MySqlDbType.Int64) { Value = WasteDetail.batchId},
                //new MySqlParameter("stockDate", MySqlDbType.DateTime) { Value = dispatch.stockDate},
                //new MySqlParameter("lastIssueDate", MySqlDbType.DateTime) { Value = dispatch.lastIssueDate},
                new MySqlParameter("active", MySqlDbType.Int16) { Value = (Int16)YesNo.Yes},
@@ -7418,29 +7299,20 @@ namespace ScottmenMainApi.Models.DLayer
 
            };
             String WHERE = "";
-            if (dispatch.dispatchId > 0)
-                WHERE += @" AND d.dispatchId=@dispatchId ";
-            if (dispatch.batchId > 0)
-                WHERE += @" AND d.batchId=@batchId ";
-            if (dispatch.batchId > 0)
-                WHERE += @" AND d.batchId=@batchId ";
-            if (dispatch.loadingId > 0)
-                WHERE += @" AND dm.loadingId=@loadingId ";
+            if (WasteDetail.brandId > 0)
+                WHERE += @" AND w.brandId=@brandId ";
+            if (WasteDetail.itemId > 0)
+                WHERE += @" AND w.itemId=@itemId ";
+            if (WasteDetail.itemStockId > 0)
+                WHERE += @" AND w.itemStockId=@itemStockId ";
+            if (WasteDetail.batchId > 0)
+                WHERE += @" AND w.batchId=@batchId ";
 
-            //if (dispatch. != null)
-            //    WHERE += @" AND DATE_FORMAT(fp.stockDate,'%d/%m/%Y')=DATE_FORMAT(@stockDate,'%d/%m/%Y')";
-            //if (dispatch.lastIssueDate != null)
-            //    WHERE += @" AND DATE_FORMAT(fp.lastIssueDate,'%d/%m/%Y')=DATE_FORMAT(@lastIssueDate,'%d/%m/%Y')";
-
-
-            query = @"SELECT d.dispatchId,d.batchId,d.brandId,d.brandName,
-							d.quantity,d.unitId,d.unitName,b.balanceQuantity,
-                        DATE_FORMAT(dm.creationTimeStamp ,'%d/%m/%Y') as dispatchDate,
-                        dm.loadingId,dm.billTNo
-        	FROM dispatch d 
-            JOIN dispatchmaster dm ON d.dispatchId=dm.dispatchId
-        	JOIN finishedproducmaster b ON b.batchId=d.batchId AND b.brandId=d.brandId				
-        	WHERE d.active=@active " + WHERE + " ORDER BY d.dispatchId DESC";
+            query = @"SELECT w.wasteId,w.wasteCategoryId,w.wasteCategory,w.itemId,
+                            w.itemStockId,w.quantity,w.remark,w.itemName,w.brandName
+                        FROM wastedetail w 
+                        WHERE w.wasteCategoryId=@wasteCategoryId AND w.active=@active
+                         " + WHERE + " ORDER BY w.creationTimeStamp DESC;";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             if (dt.table.Rows.Count > 0)
             {
@@ -7450,9 +7322,110 @@ namespace ScottmenMainApi.Models.DLayer
             }
             return ds;
         }
+
+        public async Task<ReturnClass.ReturnBool> wastageItemfromStockAsync(Int64 ItemStockId)
+        {
+            ReturnBool rb = new();
+            ReturnDataTable dt1 = await GetItemQuantityInStock(ItemStockId);
+            if (dt1.table.Rows.Count == 0)
+            {
+                rb.message = "Invalid Details Provided.";
+                return rb;
+            }
+            Int32 itemId = Convert.ToInt32(dt1.table.Rows[0]["itemId"].ToString());
+            Int64 quantity = Convert.ToInt64(dt1.table.Rows[0]["quantity"].ToString());
+
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+                    new MySqlParameter("@itemStockId", MySqlDbType.Int64) { Value = ItemStockId},
+                     new MySqlParameter("@itemId", MySqlDbType.Int32) { Value = itemId},
+                     new MySqlParameter("@quantity", MySqlDbType.Int64) { Value = quantity},
+                };
+
+
+            string query = @"INSERT INTO itemstockdetaillog
+                                    SELECT * FROM itemstockdetail i
+                                    WHERE i.itemStockId = @itemStockId; ";
+            using (TransactionScope ts = new(TransactionScopeAsyncFlowOption.Enabled))
+            {
+
+                rb = await db.ExecuteQueryAsync(query, pm, "Saveitemstockdetaillog");
+                if (rb.status)
+                {
+                    query = @"UPDATE itemstockdetail SET quantity=0 
+                                    WHERE itemStockId = @itemStockId; ";
+                    if (rb.status)
+                        rb = await db.ExecuteQueryAsync(query, pm, "Wastageitemstockdetail");
+                    if (rb.status)
+                        rb = await DecreaseItems((Int32)itemId!, (long)quantity!);
+                    if (rb.status)
+                        ts.Complete();
+                }
+
+
+            }
+
+            return rb;
+        }
+
+        public async Task<ReturnClass.ReturnBool> wastageItemfromBlendingProcess(Int64 batchId, Int32 itemId)
+        {
+            ReturnBool rb = new();
+            ReturnDataTable dt1 = await GetItemQuantityfromBlendingProcess(batchId, itemId);
+            if (dt1.table.Rows.Count == 0)
+            {
+                rb.message = "Invalid Details Provided.";
+                return rb;
+            }
+            itemId = Convert.ToInt32(dt1.table.Rows[0]["itemId"].ToString());
+            Int64 quantity = Convert.ToInt64(dt1.table.Rows[0]["quantity"].ToString());
+
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+                    new MySqlParameter("@batchId", MySqlDbType.Int64) { Value = batchId},
+                     new MySqlParameter("@itemId", MySqlDbType.Int32) { Value = itemId},
+                     new MySqlParameter("@quantity", MySqlDbType.Int64) { Value = quantity},
+                };
+            string query = @"INSERT INTO blendingitemlog
+                                    SELECT * FROM blendingitem i
+                                    WHERE i.batchId = @batchId AND i.itemId=@itemId ; ";
+            using (TransactionScope ts = new(TransactionScopeAsyncFlowOption.Enabled))
+            {
+
+                rb = await db.ExecuteQueryAsync(query, pm, "Saveblendingitemlog");
+                if (rb.status)
+                {
+                    query = @"UPDATE blendingitem SET quantity=0
+                                    WHERE batchId = @batchId AND itemId=@itemId; ";
+                    if (rb.status)
+                        rb = await db.ExecuteQueryAsync(query, pm, "Wastageblendingitem");
+                    if (rb.status)
+                        rb = await DecreaseBlendingMaster((long)batchId!, (long)quantity!);
+                    if (rb.status)
+                        ts.Complete();
+                }
+
+
+            }
+
+            return rb;
+        }
+        public async Task<ReturnClass.ReturnBool> wastageInFinalProductDuringDispatch(Int64 batchId, Int32 brandId, Int64 quantity)
+        {
+            ReturnBool rb = new();
+            rb = await DecreaseFinalProduct((long)batchId!, (long)brandId, (long)quantity);
+            if (!rb.status)
+            {
+                rb.status = false;
+                rb.message = "Something Went Wrong";
+                return rb;
+            }
+
+            return rb;
+        }
         #endregion
 
-        */
+
 
         #region Item Master Sale And purches
         private async Task<ReturnClass.ReturnBool> IncreaseItems(Int32 itemId, long quantity)
@@ -7484,9 +7457,10 @@ namespace ScottmenMainApi.Models.DLayer
         private async Task<ReturnClass.ReturnBool> IncreaseFinalProduct(Int64 batchId, Int64 brandId, long quantity)
         {
             string updateQuery = @"UPDATE finishedproducmaster SET 
-                                            totalQuantity= totalQuantity + @quantity ,
+                                            
                                         balanceQuantity= balanceQuantity + @quantity 
                                             WHERE batchId=@batchId AND brandId=@brandId ;";
+            //totalQuantity= totalQuantity + @quantity ,
             MySqlParameter[] pm = new MySqlParameter[] {
               new MySqlParameter("@batchId", MySqlDbType.Int32) { Value = batchId},
               new MySqlParameter("@brandId", MySqlDbType.Int32) { Value = brandId},
@@ -7497,16 +7471,16 @@ namespace ScottmenMainApi.Models.DLayer
         }
         private async Task<ReturnClass.ReturnBool> DecreaseFinalProduct(Int64 batchId, Int64 brandId, long quantity)
         {
-            string updateQuery = @"UPDATE finishedproducmaster SET 
-                                            totalQuantity= totalQuantity + @quantity ,
-                                        balanceQuantity= balanceQuantity + @quantity 
+            string updateQuery = @"UPDATE finishedproducmaster SET                                            
+                                        balanceQuantity= balanceQuantity - @quantity 
                                             WHERE batchId=@batchId AND brandId=@brandId  ;";
+            // totalQuantity= totalQuantity - @quantity ,
             MySqlParameter[] pm = new MySqlParameter[] {
               new MySqlParameter("@batchId", MySqlDbType.Int32) { Value = batchId},
               new MySqlParameter("@brandId", MySqlDbType.Int32) { Value = brandId},
               new MySqlParameter("@quantity", MySqlDbType.Int64) { Value = quantity}
             };
-            return await db.ExecuteQueryAsync(updateQuery, pm.ToArray(), "IncreaseFinalProduct");
+            return await db.ExecuteQueryAsync(updateQuery, pm.ToArray(), "DecreaseFinalProduct");
 
         }
 
@@ -7517,9 +7491,10 @@ namespace ScottmenMainApi.Models.DLayer
         private async Task<ReturnClass.ReturnBool> IncreaseBlendingMaster(Int64 batchId, long quantity)
         {
             string updateQuery = @"UPDATE blendingmaster SET 
-                                            totalQuantity= totalQuantity + @quantity ,
+                                            
                                         balanceQuantity= balanceQuantity + @quantity 
                                             WHERE batchId=@batchId AND brandId=@brandId ;";
+            //totalQuantity= totalQuantity + @quantity ,
             MySqlParameter[] pm = new MySqlParameter[] {
               new MySqlParameter("@batchId", MySqlDbType.Int32) { Value = batchId},
               new MySqlParameter("@quantity", MySqlDbType.Int64) { Value = quantity}
@@ -7530,9 +7505,10 @@ namespace ScottmenMainApi.Models.DLayer
         private async Task<ReturnClass.ReturnBool> DecreaseBlendingMaster(Int64 batchId, long quantity)
         {
             string updateQuery = @"UPDATE blendingmaster SET 
-                                            totalQuantity= totalQuantity + @quantity ,
-                                        balanceQuantity= balanceQuantity + @quantity 
+                                            
+                                        balanceQuantity= balanceQuantity - @quantity 
                                             WHERE batchId=@batchId AND brandId=@brandId  ;";
+            //totalQuantity= totalQuantity + @quantity ,
             MySqlParameter[] pm = new MySqlParameter[] {
               new MySqlParameter("@batchId", MySqlDbType.Int32) { Value = batchId},
               new MySqlParameter("@quantity", MySqlDbType.Int64) { Value = quantity}
@@ -7540,6 +7516,7 @@ namespace ScottmenMainApi.Models.DLayer
             return await db.ExecuteQueryAsync(updateQuery, pm.ToArray(), "DecreaseBlendingMaster");
 
         }
+
 
         #endregion
 

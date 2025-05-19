@@ -335,6 +335,7 @@ namespace ScottmenMainApi.Models.BLayer
         public string? brandName { get; set; }
         public string? brandNameHindi { get; set; }
         public Int16? active { get; set; } = (Int16)IsActive.Yes;
+        public Int16? brandCategory { get; set; } = (Int16)BrandCategory.Small;
         public long? userId { get; set; } = 0;
         public string? clientIp { get; set; }
 
@@ -499,6 +500,14 @@ namespace ScottmenMainApi.Models.BLayer
         public List<IssuePackagingMaterial> IssuePackagingMaterials { get; set; }
 
     }
+    public class RemoveIssueMaterial
+    {
+        public long? issueId { get; set; } = 0;
+
+        public Int32? itemId { get; set; }
+        public long? userId { get; set; }
+        public string? clientIp { get; set; }
+    }
     public class IssuePackagingMaterial
     {
         public long? issueId { get; set; }
@@ -598,8 +607,27 @@ namespace ScottmenMainApi.Models.BLayer
         public string? wasteCategory { get; set; }
         public decimal? quantity { get; set; }
         public string? remark { get; set; }
-        public long? id { get; set; }
+        public long? itemStockId { get; set; }
+        public long? batchId { get; set; }
+        public Int32? brandId { get; set; } = 0;
+        public string? brandName { get; set; }
+        public Int32? itemId { get; set; } = 0;
+        public string? itemName { get; set; }
         public Int16? active { get; set; } = (Int16)IsActive.Yes;
+
+        public long? userId { get; set; }
+        public string? clientIp { get; set; }
+
+
+
+    }
+    public class RemobeBlendingProcess
+    {
+
+        public long? batchId { get; set; }
+
+        public Int32? itemId { get; set; } = 0;
+
 
         public long? userId { get; set; }
         public string? clientIp { get; set; }
