@@ -5589,7 +5589,7 @@ namespace ScottmenMainApi.Models.DLayer
                                 e.itemStockId = @itemStockId;";
             MySqlParameter[] pm = new MySqlParameter[] {
 
-                    new MySqlParameter("@unloadingId", MySqlDbType.Int64) { Value = itemStockId}
+                    new MySqlParameter("@itemStockId", MySqlDbType.Int64) { Value = itemStockId}
                 };
             return await db.ExecuteSelectQueryAsync(query, pm);
 
@@ -5711,7 +5711,10 @@ namespace ScottmenMainApi.Models.DLayer
                     if (rb.status)
                         rb = await DecreaseItems((Int32)itemId!, (long)quantity!);
                     if (rb.status)
+                    {
+                        rb.message = "Item has been Removed.";
                         ts.Complete();
+                    }
                 }
 
 
@@ -6020,7 +6023,10 @@ namespace ScottmenMainApi.Models.DLayer
                     if (rb.status)
                         rb = await DecreaseBlendingMaster((long)batchId!, (long)quantity!);
                     if (rb.status)
+                    {
                         ts.Complete();
+                        rb.message = "Blending Process has been Removed.";
+                    }
                 }
 
 
@@ -6333,7 +6339,10 @@ namespace ScottmenMainApi.Models.DLayer
                     if (rb.status)
                         rb = await IncreaseItems((Int32)itemId!, (long)quantity!);
                     if (rb.status)
+                    {
                         ts.Complete();
+                        rb.message = "Issued Item has been Removed.";
+                    }
                 }
 
 
