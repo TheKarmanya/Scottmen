@@ -592,4 +592,20 @@ namespace ScottmenMainApi.Models.BLayer
         public string? unitName { get; set; }
     }
 
+    public class WasteDetail
+    {
+        public Int16? wasteCategoryId { get; set; }
+        public string? wasteCategory { get; set; }
+        public decimal? quantity { get; set; }
+        public string? remark { get; set; }
+        public long? id { get; set; }
+        public Int16? active { get; set; } = (Int16)IsActive.Yes;
+
+        public long? userId { get; set; }
+        public string? clientIp { get; set; }
+
+
+
+    }
+
 }
