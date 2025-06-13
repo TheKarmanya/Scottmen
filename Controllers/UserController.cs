@@ -693,9 +693,7 @@ namespace ScottmenMainApi.Controllers
             // ReturnString rs = new();
             //if (roleId == (int)UserRole.Administrator)
             //{
-
             return await dl.UpdateLoadingEntry(bl);
-
             //}
             //else
             //    rb.message = "User not authorized to access the report";
@@ -940,7 +938,7 @@ namespace ScottmenMainApi.Controllers
 
         [HttpPost("removeissuepackageitems")]
         // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<ReturnBool> removeBlendingProcessAsync([FromBody] RemoveIssueMaterial issueMaterial)
+        public async Task<ReturnBool> removeIssuePackageitemsAsync([FromBody] RemoveIssueMaterial issueMaterial)
         {
             issueMaterial.userId = issueMaterial.userId == null ? 0 : issueMaterial.userId;//Convert.ToInt64(User.FindFirst("userId")?.Value);
                                                                                            // itemStock[0].roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
@@ -1054,6 +1052,22 @@ namespace ScottmenMainApi.Controllers
             //else
             //    rb.message = "User not authorized to access the report";
         }
+        [HttpGet("finishedproductfordispatch")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnDataTable> GetFinishedProductForDispatch()
+        {
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            return await dl.GetFinishProductForDispatch();
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+        
 
         [HttpPost("savewastedetails")]
         // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -1085,6 +1099,21 @@ namespace ScottmenMainApi.Controllers
             //else
             //    rb.message = "User not authorized to access the report";
         }
+
+        [HttpGet("getrecipe/{brandid}")]
+        public async Task<ReturnDataTable> GetRecipe(Int64 brandid)
+        {
+            ReturnDataTable dt1 = await dl.GetRecipe(brandid);
+            return dt1;
+        }
+        [HttpPost("finishedproductsummery")]
+        public async Task<ReturnDataTable> Getfinishedproduct(SearchDetail  searchDetail)
+        {
+            ReturnDataTable dt1 = await dl.GetFinishedSummery(searchDetail);
+            return dt1;
+        }
+
+
 
     }
 }

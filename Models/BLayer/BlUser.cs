@@ -408,6 +408,7 @@ namespace ScottmenMainApi.Models.BLayer
         public string? toDate { get; set; } = string.Empty;
         public long? userId { get; set; }
         public Int16? active { get; set; } = (Int16)IsActive.Yes;
+        public Int16? showDispatchList { get; set; } = (Int16)IsActive.Yes;
 
     }
     public class ItemStockMaster
@@ -575,6 +576,7 @@ namespace ScottmenMainApi.Models.BLayer
         public Int16? active { get; set; } = (Int16)IsActive.Yes;
         public long? userId { get; set; }
         public string? clientIp { get; set; }
+        public string? billTNo { get; set; }
         public List<DispatchDetail> dispatchDetails { get; set; }
 
 
@@ -631,6 +633,16 @@ namespace ScottmenMainApi.Models.BLayer
 
         public long? userId { get; set; }
         public string? clientIp { get; set; }
+
+
+
+    }
+
+    public class SearchDetail
+    {
+
+        public DateTime? searchDate { get; set; } = DateTime.Now;
+
 
 
 

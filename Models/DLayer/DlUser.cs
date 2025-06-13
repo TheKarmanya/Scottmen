@@ -5048,6 +5048,7 @@ namespace ScottmenMainApi.Models.DLayer
             string query = "";
             ReturnDataSet ds = new();
             gatePassSearch.id = gatePassSearch.id == null ? 0 : gatePassSearch.id;
+            gatePassSearch.showDispatchList = gatePassSearch.showDispatchList == null ? 0 : gatePassSearch.showDispatchList;
             gatePassSearch.vendorId = gatePassSearch.vendorId == null ? 0 : gatePassSearch.vendorId;
             gatePassSearch.fromDate = gatePassSearch.fromDate == null ? "" : gatePassSearch.fromDate;
             gatePassSearch.toDate = gatePassSearch.toDate == null ? "" : gatePassSearch.toDate;
@@ -5080,6 +5081,8 @@ namespace ScottmenMainApi.Models.DLayer
                 WHERE += @" AND u.vendorId=@vendorId ";
             if (gatePassSearch.billTNo != string.Empty)
                 WHERE += @" AND u.billTNo=@billTNo ";
+            if (gatePassSearch.showDispatchList == (Int16)YesNo.Yes)
+                WHERE += @" AND u.exitTime IS NULL ";
             if (gatePassSearch.fromDate != string.Empty && gatePassSearch.toDate != string.Empty)
             {
                 if (gatePassSearch.fromDate == gatePassSearch.toDate)
@@ -5431,9 +5434,10 @@ namespace ScottmenMainApi.Models.DLayer
                     WHERE += @" AND DATE_FORMAT(u.creationTimeStamp,'%d/%m/%Y') = DATE_FORMAT(fromDate,'%d/%m/%Y')  ";
             }
             query = @"SELECT u.unloadingId,u.personName,u.vehicleNo,u.billTNo,DATE_FORMAT(u.creationTimeStamp,'%d/%m/%Y') AS gatePassDate ,
-                            u.vendorId,u.vendorName,ui.itemId,ui.itemName
+                            u.vendorId,u.vendorName,ui.itemId,ui.itemName,i.categoryType,i.itemTypeId,i.itemTypeName
                             FROM unloadingentry u 
                             JOIN unloadingitems ui ON ui.unloadingId=u.unloadingId AND ui.active=@active
+                            JOIN itemmaster i ON i.itemId=ui.itemId 
                             WHERE u.unloadingId NOT IN (SELECT i.unloadingId FROM itemstockdetail i )
                                 AND u.active=@active " + WHERE + @"
                       ORDER BY u.creationTimeStamp DESC ";
@@ -5996,7 +6000,7 @@ namespace ScottmenMainApi.Models.DLayer
                 return rb;
             }
             itemId = Convert.ToInt32(dt1.table.Rows[0]["itemId"].ToString());
-            Int64 quantity = Convert.ToInt64(dt1.table.Rows[0]["quantity"].ToString());
+            decimal quantity = Convert.ToDecimal(dt1.table.Rows[0]["quantity"].ToString());
 
             MySqlParameter[] pm = new MySqlParameter[] {
 
@@ -6019,9 +6023,9 @@ namespace ScottmenMainApi.Models.DLayer
                     if (rb.status)
                         rb = await db.ExecuteQueryAsync(query, pm, "Deleteblendingitem");
                     if (rb.status)
-                        rb = await IncreaseItems((Int32)itemId!, (long)quantity!);
+                        rb = await IncreaseItems((Int32)itemId!, Convert.ToInt64(quantity!));
                     if (rb.status)
-                        rb = await DecreaseBlendingMaster((long)batchId!, (long)quantity!);
+                        rb = await DecreaseBlendingMaster((long)batchId!, Convert.ToInt64(quantity!));
                     if (rb.status)
                     {
                         ts.Complete();
@@ -6081,7 +6085,7 @@ namespace ScottmenMainApi.Models.DLayer
 
                 dt.table.TableName = "blendingMaster";
                 ds.dataset.Tables.Add(dt.table);
-                query = @"SELECT bm.batchId,bi.itemId,bi.quantity,bi.unitId,bi.unitName
+                query = @"SELECT bm.batchId,bi.itemId,bi.itemName,bi.quantity,bi.unitId,bi.unitName
                          FROM blendingmaster bm 
                         JOIN blendingitem bi ON bi.batchId=bm.batchId
                         WHERE bi.active=@active " + WHERE;
@@ -7000,7 +7004,15 @@ namespace ScottmenMainApi.Models.DLayer
                 {
                     rb = await AddDispatchItem(dispatch, isBlendingProcessExistsI, 1);
                     if (rb.status)
-                        ts.Complete();
+                    {
+                        LoadingEntry loadingEntry = new();
+                        loadingEntry.loadingId = dispatch.loadingId;
+                        loadingEntry.remark = dispatch.remark;
+                        loadingEntry.billTNo = dispatch.billTNo;
+                        rs = await UpdateLoadingExitTime(loadingEntry);
+                        if (rs.status)
+                            ts.Complete();
+                    }
                 }
             }
             if (rb.status)
@@ -7201,6 +7213,33 @@ namespace ScottmenMainApi.Models.DLayer
 
             }
             return ds;
+        }
+
+
+
+        /*
+        
+         */
+        /// <summary>
+        /// 
+        /// Get Finish Product For Dispatch
+        /// </summary>
+        /// <returns></returns>
+        public async Task<ReturnDataTable> GetFinishProductForDispatch()
+        {
+
+            string query = @" SELECT f.batchId,f.brandId,f.brandName,f.unitId,f.unitName,f.balanceQuantity
+                            FROM finishedproducmaster f  				
+        	WHERE f.active=1 AND f.balanceQuantity >0 ORDER BY f.batchId";
+            dt = await db.ExecuteSelectQueryAsync(query);
+            if (dt.table.Rows.Count > 0)
+                dt.status = true;
+            else
+                dt.status = false;
+
+
+
+            return dt;
         }
         #endregion
 
@@ -7528,6 +7567,134 @@ namespace ScottmenMainApi.Models.DLayer
 
 
         #endregion
+
+        /// <summary>
+        /// 
+        /// Get Recipe List
+        /// </summary>
+        /// <returns></returns>
+        public async Task<ReturnDataTable> GetRecipe(Int64 brandId)
+        {
+            string query = "";
+            ReturnDataTable dt = new();
+
+            brandId = brandId == null ? 0 : brandId;
+
+
+            MySqlParameter[] pm = new MySqlParameter[]
+           {
+
+
+
+               new MySqlParameter("brandId", MySqlDbType.Int64) { Value = brandId},
+
+               new MySqlParameter("active", MySqlDbType.Int16) { Value = (Int16)YesNo.Yes},
+
+
+           };
+
+            query = @"SELECT br.brandId,br.brandName,br.brandNameHindi,r.recipeId,
+                        r.recipeName,r.waterPercent,r.ABVPercent,r.otherPercent,
+                        ROUND(( r.waterPercent/100*10000 ),2) AS water,
+                        ROUND(( r.ABVPercent/100*10000 ),2) AS ABV,
+                          ROUND(( r.otherPercent/100*10000 ),2) AS other
+                         FROM recipemaster  r
+                        JOIN brandmaster br ON br.recipeId=r.recipeId
+                        WHERE br.brandId=@brandId;";
+            dt = await db.ExecuteSelectQueryAsync(query, pm);
+            if (dt.table.Rows.Count > 0)
+                dt.status = true;
+            else
+                dt.status = false;
+
+            return dt;
+        }
+
+        /// <summary>
+        /// 
+        /// Get FinishedSummery
+        /// </summary>
+        /// <returns></returns>
+        public async Task<ReturnDataTable> GetFinishedSummery(SearchDetail search)
+        {
+            string query = "";
+            ReturnDataTable dt = new();
+
+            search.searchDate = search.searchDate == null ? DateTime.Now : search.searchDate;
+
+
+            MySqlParameter[] pm = new MySqlParameter[]
+           {
+
+
+
+               new MySqlParameter("searchDate", MySqlDbType.DateTime) { Value = search.searchDate},
+
+               new MySqlParameter("active", MySqlDbType.Int16) { Value = (Int16)YesNo.Yes},
+
+
+           };
+
+            query = @"SELECT f.brandName,f.brandId,f.unitId,f.unitName,
+                            SUM(f.balanceQuantity) AS quantity 
+                            FROM finishedproducmaster f 
+                        WHERE f.active=@active AND 
+                        DATE_FORMAT(f.creationTimeStamp,'%d/%m/%Y') = DATE_FORMAT(@searchDate,'%d/%m/%Y')
+                        GROUP BY f.brandName,f.unitName;";
+            dt = await db.ExecuteSelectQueryAsync(query, pm);
+            ReturnDataTable dt1 = new();
+            if (dt.table.Rows.Count > 0)
+            {
+                dt1.status = true;
+                dt1.table = PivotDataTable(dt.table);
+            }
+            else
+                dt1.status = false;
+
+            return dt1;
+        }
+
+        public DataTable PivotDataTable(DataTable source)
+        {
+            // Get distinct unitNames for columns
+            var unitNames = source.AsEnumerable()
+                                  .Select(r => r.Field<string>("unitName"))
+                                  .Distinct()
+                                  .OrderBy(u => u)
+                                  .ToList();
+
+            // Create pivoted DataTable
+            DataTable pivotTable = new DataTable();
+            pivotTable.Columns.Add("brandName");
+
+            // Add dynamic unit columns
+            foreach (var unit in unitNames)
+                pivotTable.Columns.Add(unit, typeof(decimal));
+
+            // Get unique brandNames
+            var brandNames = source.AsEnumerable()
+                                   .Select(r => r.Field<string>("brandName"))
+                                   .Distinct();
+
+            foreach (var brand in brandNames)
+            {
+                DataRow newRow = pivotTable.NewRow();
+                newRow["brandName"] = brand;
+
+                foreach (var unit in unitNames)
+                {
+                    var sum = source.AsEnumerable()
+                        .Where(r => r.Field<string>("brandName") == brand && r.Field<string>("unitName") == unit)
+                        .Sum(r => r.Field<decimal>("quantity"));
+
+                    newRow[unit] = sum;
+                }
+
+                pivotTable.Rows.Add(newRow);
+            }
+
+            return pivotTable;
+        }
 
 
     }
