@@ -7153,20 +7153,11 @@ namespace ScottmenMainApi.Models.DLayer
             ReturnDataTable dt = new();
 
             brandId = brandId == null ? 0 : brandId;
-
-
             MySqlParameter[] pm = new MySqlParameter[]
            {
-
-
-
                new MySqlParameter("brandId", MySqlDbType.Int64) { Value = brandId},
-
                new MySqlParameter("active", MySqlDbType.Int16) { Value = (Int16)YesNo.Yes},
-
-
            };
-
             query = @"SELECT br.brandId,br.brandName,br.brandNameHindi,r.recipeId,
                         r.recipeName,r.waterPercent,r.ABVPercent,r.otherPercent,
                         ROUND(( r.waterPercent/100*10000 ),2) AS water,
@@ -7457,6 +7448,7 @@ namespace ScottmenMainApi.Models.DLayer
               new MySqlParameter("@purchaseOrderId", MySqlDbType.Int64) { Value = purchaseOrder.purchaseOrderId},
               new MySqlParameter("@vendorId", MySqlDbType.Int64) { Value = purchaseOrder.vendorId},
               new MySqlParameter("@itemId", MySqlDbType.Int64) { Value = purchaseOrder.itemId},
+              new MySqlParameter("@active", MySqlDbType.Int16) { Value = (Int16)YesNo.Yes},
 
                  };
             String WHERE = "";
@@ -7474,16 +7466,47 @@ namespace ScottmenMainApi.Models.DLayer
             //    return dt;
             //}
 
-            query = @"SELECT m.purchaseOrderId,m.vendorId,v.vendorName,m.itemId,i.itemName,i.shortName,m.quantity
+            query = @"SELECT m.purchaseOrderId,m.vendorId,v.vendorName,m.itemId,i.itemName,i.unitName,i.shortName,
+                            m.quantity,v.email AS vendorMailId,m.isMailSent,IFNULL(mt.templateId,0) AS templateId
                         FROM purchaseorder m
                         JOIN vendormaster v ON v.vendorId=m.vendorId
                         JOIN itemmaster i ON  i.itemId=m.itemId
+                        LEFT JOIN mailtemplate mt ON mt.vendorId=m.vendorId AND mt.itemId=m.itemId
                         WHERE  m.active=@active
                          " + WHERE + " ORDER BY m.creationTimeStamp DESC;";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             if (dt.table.Rows.Count == 0)
                 dt.status = false;
             return dt;
+        }
+
+        public async Task<ReturnClass.ReturnBool> UpdateMailSentToVendor(Int64 purchaseOrderId)
+        {
+            string query = @"INSERT INTO purchaseorderlog
+                                        SELECT * FROM purchaseorder
+                                        WHERE purchaseOrderId=@purchaseOrderId ";
+            ReturnBool returnBool = new();
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+              new MySqlParameter("@purchaseOrderId", MySqlDbType.Int64) { Value = purchaseOrderId},
+              new MySqlParameter("@isMailSent", MySqlDbType.Int16) { Value = (Int16)YesNo.Yes}
+
+                 };
+            using (TransactionScope ts = new(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                returnBool = await db.ExecuteQueryAsync(query, pm.ToArray(), "InsertPurchaseOrderlog");
+
+                if (returnBool.status)
+                {
+                    query = @"UPDATE purchaseorder SET isMailSent=@isMailSent
+                                                        WHERE 
+                                                  purchaseOrderId=@purchaseOrderId ";
+                    returnBool = await db.ExecuteQueryAsync(query, pm.ToArray(), "UpdatePurchaseOrderIsMailSent");
+                }
+                if (returnBool.status)
+                    ts.Complete();
+            }
+            return returnBool;
         }
         #endregion
 

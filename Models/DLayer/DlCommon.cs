@@ -1696,5 +1696,19 @@ namespace ScottmenMainApi.Models.DLayer
         }
         #endregion
 
+          public async Task<ReturnBool> CalculateDensity(SpiritDensity spiritDensity)
+        {
+            ReturnBool rb = new();
+            if (spiritDensity.density > 0)
+            {
+                rb.status = true;
+                spiritDensity.density = (spiritDensity.density / 100) + 1;
+                decimal OtherVolume = Convert.ToDecimal(0.75);
+                decimal cal_Val = Convert.ToDecimal((spiritDensity.avp * spiritDensity.density) / OtherVolume);
+                rb.value = (Math.Round(cal_Val,2)).ToString();
+            }
+            return rb;
+        }
+
     }
 }

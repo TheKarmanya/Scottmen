@@ -677,7 +677,8 @@ namespace ScottmenMainApi.Models.BLayer
 
     }
     public class SendMailAddress
-    {     
+    {
+        public long? purchaseOrderId { get; set; }
         public string? ToAddress { get; set; }
         public string? emailSubject { get; set; }
         public string? emailBody { get; set; }
@@ -687,6 +688,12 @@ namespace ScottmenMainApi.Models.BLayer
         public long? userId { get; set; }
 
     }
-   
+    public class SpiritDensity
+    {
+        public decimal? density { get; set; } = 0;
+        public decimal? avp { get; set; } = 4000;
+
+    }
+
 
 }

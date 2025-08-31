@@ -1271,7 +1271,10 @@ namespace ScottmenMainApi.Controllers
             }
             else
                 rb = await email.SendAsync(ToAddress, sendMailAddress.emailSubject!, sendMailAddress.emailBody!, sendMailAddress.Attachments!);
+            if (rb.status && sendMailAddress.purchaseOrderId > 0)
+                rb = await dl.UpdateMailSentToVendor((long)sendMailAddress.purchaseOrderId);
             await dl.SaveMailedData(sendMailAddress, rb.status);
+
             rb.message = "Something went wrong..Please try again..";
             if (rb.status)
                 rb.message = "Mail has been Sent.";
