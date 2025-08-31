@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using ScottmenMainApi.Models.BLayer;
 using ScottmenMainApi.Models.DLayer;
+using System.Net.Mail;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using static BaseClass.ReturnClass;
 
 namespace ScottmenMainApi.Controllers
@@ -29,40 +31,6 @@ namespace ScottmenMainApi.Controllers
             return rbReturn;
         }
 
-        [HttpPost("RegisterNewUser")]
-        public async Task<ReturnString> RegisterNewAccount([FromBody] BlUser blUser)
-        {
-            ReturnBool rbBuild = Utilities.GetAppSettings("Build", "Version");
-            string buildType = rbBuild.message;
-            string accessPath = "URL";
-            string captchaVerificationUrl = Utilities.GetAppSettings("CaptchaVerificationURL", buildType, accessPath).message;
-            ReturnBool rbCaptcha = await dlCommon.VerifyCaptchaAsync(captchaID: blUser.captchaId, userEnteredCaptcha: blUser.userEnteredCaptcha, captchaVerificationUrl);
-            ReturnString rbReturn = new();
-            //rbCaptcha.status = true;
-            if (rbCaptcha.status)
-            {
-                string userAgent = Request.Headers[HeaderNames.UserAgent];
-                BrowserContext br = Utilities.DetectBrowser(userAgent);
-                blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
-                blUser.clientOs = br.OS;
-                blUser.clientBrowser = br.BrowserName;
-
-                ReturnString rb = await dl.RegisterIndustrialUserAsync(blUser);
-                if (rb.status)
-                {
-                    rbReturn.message = "Done. Please verify your contact details now";
-                    rbReturn.value = rb.value;
-                    rbReturn.msgId = rb.msgId;
-                    rbReturn.status = rb.status;
-                    rbReturn.secondryId = rb.secondryId;
-                }
-                else
-                    rbReturn.message = "Failed to register your account. Please try later " + rbReturn.value;
-            }
-            else
-                rbReturn.message = rbCaptcha.message;
-            return rbReturn;
-        }
 
         [HttpPost("verifynewcontact")]
         public async Task<ReturnBool> VerifyContactDetailsNewUser([FromBody] BlUser blUser)
@@ -117,26 +85,7 @@ namespace ScottmenMainApi.Controllers
             else
                 return new ReturnBool { message = "Invalid Session. Failed to Change your password" };
         }
-        [HttpPost("sendotp")]
-        public async Task<ReturnString> SendOTP([FromBody] SendOtp blUser)
-        {
 
-            blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
-            ReturnString rb = await dl.SendOTP(blUser);
-            if (rb.status)
-                rb.message = "OTP has been sent. Please verify your contact details now";
-            return rb;
-        }
-        [HttpPost("resendotp")]
-        public async Task<ReturnString> ReSendOTP([FromBody] SendOtp blUser)
-        {
-
-            blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
-            ReturnString rb = await dl.ReSendOTP(blUser);
-            if (rb.status)
-                rb.message = "OTP has been resent. Please verify your contact details now";
-            return rb;
-        }
         [HttpPost("verifyotp")]
         public async Task<ReturnBool> VerifyPublicOTP([FromBody] SendOtp blUser)
         {
@@ -147,15 +96,7 @@ namespace ScottmenMainApi.Controllers
                 rb.message = "OTP has been verified.";
             return rb;
         }
-        [HttpPost("getforgetdetail")]
-        public async Task<ReturnString> UserAccountExist([FromBody] SendOtp send)
-        {
-            ReturnClass.ReturnString rs = await dl.CheckUserAccountExist(send);
-            if (!rs.status)
-                rs.message = rs.message;
 
-            return rs;
-        }
         [HttpPost("forgotpassword")]
         public async Task<ReturnBool> UpdateForgotPassword([FromBody] BlUser blUser)
         {
@@ -198,18 +139,7 @@ namespace ScottmenMainApi.Controllers
             return rb;
         }
 
-        /// <summary>
-        /// Send Email 
-        /// </summary>
-        /// <param name="blProject"></param>
-        /// <returns></returns>
-        [HttpPost("testemail")]
-        // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<ReturnBool> SendEmaild([FromBody] emailSenderClass sendEmail)
-        {
-            Email email = new();
-            return await email.SendEmailViaURLAsync(sendEmail);
-        }
+
 
         /// <summary>
         /// Sandesh message sender method
@@ -1038,12 +968,13 @@ namespace ScottmenMainApi.Controllers
             //    rb.message = "User not authorized to access the report";
         }
         [HttpPost("dispatchlist")]
-        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        //[AllowAnonymous]
         public async Task<ReturnDataSet> GetDispatchListList(DispatchSearch dispatch)
         {
-            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
-            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
-            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            string clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
             // ReturnString rs = new();
             //if (roleId == (int)UserRole.Administrator)
             //{
@@ -1067,7 +998,7 @@ namespace ScottmenMainApi.Controllers
             //else
             //    rb.message = "User not authorized to access the report";
         }
-        
+
 
         [HttpPost("savewastedetails")]
         // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -1107,12 +1038,253 @@ namespace ScottmenMainApi.Controllers
             return dt1;
         }
         [HttpPost("finishedproductsummery")]
-        public async Task<ReturnDataTable> Getfinishedproduct(SearchDetail  searchDetail)
+        public async Task<ReturnDataTable> Getfinishedproduct(SearchDetail searchDetail)
         {
             ReturnDataTable dt1 = await dl.GetFinishedSummery(searchDetail);
             return dt1;
         }
 
+        [HttpPost("createuserlogin")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnBool> CreateUserLogin(UserLogin user)
+        {
+            ReturnBool rb = new();
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            DlCommon dlCommon = new();
+            rb = await dlCommon.SaveUserLogin(user);
+            rb.message = "Something went wrong..Please try again..";
+            if (rb.status)
+                rb.message = "Login-ID has been Updated..";
+            return rb;
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+        [HttpPost("useractivation")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnBool> UserLoginActivation(UserLogin user)
+        {
+            ReturnBool rb = new();
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            DlCommon dlCommon = new();
+            rb = await dlCommon.UserActivation(user);
+            rb.message = "Something went wrong..Please try again..";
+            if (rb.status)
+            {
+                if (user.isActive == (Int16)IsActive.Yes)
+                    rb.message = "Login-ID has been Activated..";
+                else if (user.isActive == (Int16)IsActive.No)
+                    rb.message = "Login-ID has been Deactivated..";
+            }
+            return rb;
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+        [HttpGet("userlist")]
+        [AllowAnonymous]
+        public async Task<ReturnDataTable> GetUserLoginList()
+        {
+            DlCommon dlCommon = new();
+            long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            string clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            ReturnDataTable dt1 = await dlCommon.GetUserList();
+            return dt1;
+        }
+
+        [HttpPost("resetpassword")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnBool> RestePassword(UserLogin user)
+        {
+            ReturnBool rb = new();
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            DlCommon dlCommon = new();
+            rb = await dlCommon.ResetPassword(user);
+            rb.message = "Something went wrong..Please try again..";
+            if (rb.status)
+                rb.message = "Password Successfully Reset..";
+            return rb;
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+
+        [HttpPost("savemailtemplate")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnBool> SaveMailTemplate(MailTemplate mailTemplate)
+        {
+            ReturnBool rb = new();
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            DlCommon dlCommon = new();
+            rb = await dl.SaveMailTemplate(mailTemplate);
+            rb.message = "Something went wrong..Please try again..";
+            if (rb.status)
+                rb.message = "Mail Template Saved...";
+            return rb;
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+
+        [HttpPost("updatemailtemplate")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnBool> UpdateMailTemplate(MailTemplate mailTemplate)
+        {
+            ReturnBool rb = new();
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            DlCommon dlCommon = new();
+            rb = await dl.UpdateMailTemplate(mailTemplate);
+            rb.message = "Something went wrong..Please try again..";
+            if (rb.status)
+                rb.message = "Mail Template Updated...";
+            return rb;
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+
+        [HttpPost("getmailtemplate")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnDataTable> GetMailTemplate(MailTemplate mailTemplate)
+        {
+            ReturnBool rb = new();
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{            
+            return await dl.GetMailTemplate(mailTemplate);
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+
+
+
+
+        [HttpPost("savepurchaseorder")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnBool> SavePurchaseOrder(PurchaseOrder purchaseOrder)
+        {
+            ReturnBool rb = new();
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            DlCommon dlCommon = new();
+            rb = await dl.SavePurchaseOrder(purchaseOrder);
+            rb.message = "Something went wrong..Please try again..";
+            if (rb.status)
+                rb.message = "Purchase Order Saved...";
+            return rb;
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+
+        [HttpPost("updatepurchaseorder")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnBool> UpdatePurchaseOrder(PurchaseOrder purchase)
+        {
+            ReturnBool rb = new();
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            DlCommon dlCommon = new();
+            rb = await dl.UpdatePurchaseOrder(purchase);
+            rb.message = "Something went wrong..Please try again..";
+            if (rb.status)
+                rb.message = "Purchase Order Updated...";
+            return rb;
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+
+        [HttpPost("getpurchaseorder")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnDataTable> GetPurchaseOrder(PurchaseOrder purchase)
+        {
+            ReturnBool rb = new();
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{            
+            return await dl.GetPurchaseOrder(purchase);
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+
+        [HttpPost("sendemail")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnBool> SendMail(SendMailAddress sendMailAddress)
+        {
+            ReturnBool rb = new();
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+            Email email = new();
+            string ToAddress = CleanEmail(sendMailAddress.ToAddress!);
+            if (!string.IsNullOrEmpty(sendMailAddress.ccAddress))
+            {
+                string ccMailId = CleanEmail(sendMailAddress.ccAddress!);
+                rb = await email.SendAsync(ToAddress, sendMailAddress.emailSubject!, sendMailAddress.emailBody!, sendMailAddress.Attachments!,
+                    ccMailId);
+            }
+            else
+                rb = await email.SendAsync(ToAddress, sendMailAddress.emailSubject!, sendMailAddress.emailBody!, sendMailAddress.Attachments!);
+            await dl.SaveMailedData(sendMailAddress, rb.status);
+            rb.message = "Something went wrong..Please try again..";
+            if (rb.status)
+                rb.message = "Mail has been Sent.";
+            return rb;
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
+        string CleanEmail(string email)
+        {
+            // Remove invisible/Unicode control characters
+            return Regex.Replace(email, @"[^\u0000-\u007F]+", "");
+        }
 
 
     }

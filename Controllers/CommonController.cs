@@ -159,52 +159,7 @@ namespace ScottmenMainApi.Controllers
             List<ListData> lv = await dl.GetCommonDataAsync(category: category, language: language);
             return lv;
         }
-        /// <summary>
-        /// Get Year For Unit Registration
-        /// </summary>       
-        /// <returns></returns>
-        [HttpGet("unityear")]
-        public async Task<List<ListValue>> GetUnitYearAsync()
-        {
-            List<ListValue> lv = await dl.GetYearForUnitAsync();
-            return lv;
-        }
-        /// <summary>
-        /// Get Service List By Project Id 
-        /// </summary>
-        ///  /// <param name="id"></param>
-        /// <param name="language"></param>
-        /// <returns></returns>
-        [HttpGet("servicelist/{id}/{language?}")]
-        public async Task<List<ListValue>> GetServiceListAsync(Int64 id, LanguageSupported language = LanguageSupported.English)
-        {
-            List<ListValue> lv = await dl.GetServicetList(id, language: language);
-            return lv;
-        }
-        /// <summary>
-        /// Get Project List With Live Service Counter
-        /// </summary>
-        /// <param name="language"></param>
-        /// <returns></returns>
-        [HttpGet("projectservice/{language?}")]
-        public async Task<List<ListValue>> GetProjectServiceCounterAsync(LanguageSupported language = LanguageSupported.English)
-        {
-            List<ListValue> lv = await dl.GetProjectServicecounter(language: language);
-            return lv;
-        }
-        /// <summary>
-        /// Get Live Service List 
-        /// </summary>
-        ///  /// <param name="id"></param>
-        /// <param name="language"></param>
-        /// <returns></returns>
-        [HttpGet("liveservice/{id?}/{language?}")]
-        public async Task<List<ListValue>> GetLiveServiceListAsync(Int64 id = 0, LanguageSupported language = LanguageSupported.English)
-        {
-            List<ListValue> lv = await dl.GetLiveServicetList(id, language: language);
-            return lv;
-        }
-
+       
         [HttpGet("myip")]
         public ReturnClass.ReturnString GetMyIP()
         {

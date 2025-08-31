@@ -1,4 +1,5 @@
 ﻿using BaseClass;
+using System.Net.Mail;
 
 namespace ScottmenMainApi.Models.BLayer
 {
@@ -59,8 +60,7 @@ namespace ScottmenMainApi.Models.BLayer
         public int primaryRole { get; set; } = 0;
         public bool forceChangePassword { get; set; }
         public DateTime disabledTime { get; set; }
-        //public int userRole { get; set; }
-        public bool isNationalSingleWindowUser { get; set; }
+
         public int userTypeCode { get; set; }
         public bool isLoginSuccessful { get; set; } = false;
         public string message { get; set; } = "";
@@ -70,15 +70,6 @@ namespace ScottmenMainApi.Models.BLayer
         public string emailId { get; set; } = "";
         public long mobileNo { get; set; }
         public string loginId { get; set; } = "";
-        public Int16? isSingleWindowUser { get; set; } = 0;
-        public string swsRedirectURL { get; set; } = "";
-
-        public List<UserProjectResponse> userProjectResponse { get; set; }
-        public Int16? openOTP { get; set; } = 0;
-        public Int16? isDashboardMigrated { get; set; } = 1;
-        public string? emp_id { get; set; }
-
-
     }
     public class UserLoginResponseFailure
     {
@@ -468,6 +459,8 @@ namespace ScottmenMainApi.Models.BLayer
         public Int16? active { get; set; } = (Int16)IsActive.Yes;
         public long? userId { get; set; }
         public string? clientIp { get; set; }
+        public decimal? density { get; set; }
+        
         public List<BlendingItems> blendingItems { get; set; }
 
     }
@@ -640,12 +633,60 @@ namespace ScottmenMainApi.Models.BLayer
 
     public class SearchDetail
     {
-
         public DateTime? searchDate { get; set; } = DateTime.Now;
+    }
 
-
-
+    public class UserLogin
+    {
+        public Int64 userId { get; set; }
+        public string? emailId { get; set; } = "";
+        public string? password { get; set; } = "";
+        public string? userName { get; set; } = "";
+        public Int16? forceChangePassword { get; set; } = 0;
+        public Int16? isActive { get; set; } = 1;
+        public string? clientIp { get; set; } = "";
+        public Int16? userRole { get; set; }
+        public Int32? registrationYear { get; set; } = DateTime.Now.Year;
 
     }
+
+    public class MailTemplate
+    {
+        public long? templateId { get; set; }       
+        public string? templateName { get; set; }
+        public Int32? vendorId { get; set; }
+        public string? vendorName { get; set; }
+        public Int32? itemId { get; set; }
+        public string? itemName { get; set; }      
+        public string? mailBody { get; set; }       
+        public Int16? active { get; set; } = (Int16)IsActive.Yes;
+        public long? userId { get; set; }
+        public string? clientIp { get; set; }       
+
+    }
+    public class PurchaseOrder
+    {
+        public long? purchaseOrderId { get; set; }
+        public Int32? vendorId { get; set; }
+        public Int32? itemId { get; set; }
+        public decimal? quantity { get; set; }
+       
+        public Int16? active { get; set; } = (Int16)IsActive.Yes;
+        public long? userId { get; set; }
+        public string? clientIp { get; set; }
+
+    }
+    public class SendMailAddress
+    {     
+        public string? ToAddress { get; set; }
+        public string? emailSubject { get; set; }
+        public string? emailBody { get; set; }
+        public string? ccAddress { get; set; }
+       public List<Attachment>? Attachments { get; set; }
+        public string? clientIp { get; set; }
+        public long? userId { get; set; }
+
+    }
+   
 
 }

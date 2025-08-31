@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using ScottmenMainApi.Middlewares;
+using ScottmenMainApi.Models.MLayer;
 using System.Reflection;
 using System.Text;
 using static BaseClass.ReturnClass;
@@ -153,7 +153,7 @@ app.UseForwardedHeaders();
 //
 app.UseCors();
 //app.UseRouting();
-app.UseAuthentication();
+//app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<AuthorizationMiddleware>();
 app.MapControllers();

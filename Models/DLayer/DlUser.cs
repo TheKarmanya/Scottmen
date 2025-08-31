@@ -7,6 +7,7 @@ using System.Data;
 using System.Data.Common;
 using System.Diagnostics.Metrics;
 using System.Net;
+using System.Reflection;
 using System.Reflection.Emit;
 using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
@@ -28,84 +29,6 @@ namespace ScottmenMainApi.Models.DLayer
         DlCommon dlCommon = new();
         public object HttpContext { get; private set; }
         #region Industrial Profile Registration
-        /// <summary>
-        /// Register New Industrial User
-        /// </summary> s
-        /// <param name="bl"></param>
-        /// <returns></returns>
-        public async Task<ReturnClass.ReturnString> RegisterIndustrialUserAsync(BlUser bl)
-        {
-            ReturnClass.ReturnString rs = await GenerateUserRegistrationId();
-            ReturnClass.ReturnBool rb = new ReturnClass.ReturnBool();
-            bl.mobileNo = Convert.ToInt64(bl.mobileNo.ToString().Substring(bl.mobileNo.ToString().Length - 10));
-            string mobileno = bl.mobileNo.ToString();
-            Match match = Regex.Match(mobileno,
-                              @"^[6-9]\d{9}$", RegexOptions.IgnoreCase);
-            if (match.Success == false)
-            {
-                rs.status = false;
-                rs.message = "Invalid Mobile Number";
-                return rs;
-            }
-            match = Regex.Match(bl.emailId.ToString(),
-                             @"^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$", RegexOptions.IgnoreCase);
-            if (match.Success == false)
-            {
-                rs.status = false;
-                rs.message = "Given email id is not valid.";
-                return rs;
-            }
-            DlCommon dlCommon = new();
-            if (rs.status)
-            {
-                bl.registrationId = rs.id;
-                bl.registrationUId = Utilities.CreateHash(rs.id.ToString(), HashingAlgorithmSupported.Sha256);
-                bl.registrationCount = Convert.ToInt64(rs.value);
-                string query = @"INSERT INTO userregistration (registrationId, registrationUId, applicantFirstName,applicantMiddleName,applicantLastName, emailId, mobileNo, password, clientIp, clientOs, clientBrowser,registrationCount,registrationYear)
-                                    VALUES (@registrationId, @registrationUId, @applicantFirstName,@applicantMiddleName,@applicantLastName, @emailId, @mobileNo, @password, @clientIp, @clientOs, @clientBrowser,@registrationCount,@registrationYear)";
-                MySqlParameter[] pm = new MySqlParameter[] {
-                    new MySqlParameter("registrationId", MySqlDbType.Int64) { Value = bl.registrationId},
-                    new MySqlParameter("registrationUId", MySqlDbType.String) { Value = bl.registrationUId},
-                    new MySqlParameter("registrationCount", MySqlDbType.Int64) { Value = bl.registrationCount},
-                    new MySqlParameter("registrationYear", MySqlDbType.Int32) { Value = DateTime.Now.Year},
-                    new MySqlParameter("applicantFirstName", MySqlDbType.VarString) { Value = bl.applicantFirstName},
-                    new MySqlParameter("applicantMiddleName", MySqlDbType.VarString) { Value = bl.applicantMiddleName},
-                    new MySqlParameter("applicantLastName", MySqlDbType.VarString) { Value = bl.applicantLastName},
-                    new MySqlParameter("emailId", MySqlDbType.VarString) { Value = bl.emailId},
-                    new MySqlParameter("mobileNo", MySqlDbType.Int64) { Value = bl.mobileNo},
-                    new MySqlParameter("password", MySqlDbType.String) { Value = bl.password},
-                    new MySqlParameter("clientIp", MySqlDbType.String) { Value = bl.clientIp},
-                    new MySqlParameter("clientOs", MySqlDbType.String) { Value = bl.clientOs},
-                    new MySqlParameter("clientBrowser", MySqlDbType.String) { Value = bl.clientBrowser}
-                };
-
-                rb = await db.ExecuteQueryAsync(query, pm, "RegisterIndustrialUser");
-                if (rb.status)
-                {
-                    rs.value = "";
-                    SendOtp sendOTP = new();
-                    sendOTP.emailId = bl.emailId;
-                    sendOTP.mobileNo = bl.mobileNo;
-                    sendOTP.msgType = "User Registration";
-                    ReturnClass.ReturnString rs1 = new();
-                    rs1 = await SendOTP(sendOTP);
-                    rs.msgId = rs1.msgId;
-                    rs.value = bl.registrationUId;
-                    if (rs1.status)
-                    {
-                        sendOTP.msgId = rs1.msgId;
-                        rs1 = await SendEmailOTP(sendOTP);
-                    }
-                }
-                else
-                    rs.message = "Failed to Register User";
-            }
-
-            else
-                rs.message = "Failed to generate registration Id";
-
-            return rs;
-        }
 
         /// <summary>
         /// Verify Contact Details to complete registration process
@@ -363,7 +286,7 @@ namespace ScottmenMainApi.Models.DLayer
                         {
                     new MySqlParameter("registrationUId", MySqlDbType.String) { Value = bl.registrationUId},
                     new MySqlParameter("userTypeCode", MySqlDbType.Int16) { Value = (Int16)UserTypeCode.NotApplicable},
-                    new MySqlParameter("userRole", MySqlDbType.Int16) { Value = (Int16)UserRole.OnlineUser},
+                    new MySqlParameter("userRole", MySqlDbType.Int16) { Value = (Int16)UserRole.ProductionSupervisor},
                     new MySqlParameter("clientIp", MySqlDbType.VarChar) { Value = bl.clientIp},
                         };
                         rb = await db.ExecuteQueryAsync(query, pmUser, "UpdateNewUserPasswordAsync(insert)");
@@ -746,25 +669,24 @@ namespace ScottmenMainApi.Models.DLayer
             {
 
                 bool allowLogin = true;
-                Int64 swsProjectId = 0;
+
                 List<MySqlParameter> pm = new();
                 pm.Add(new MySqlParameter("isActive", MySqlDbType.Int16) { Value = (int)IsActive.Yes });
                 pm.Add(new MySqlParameter("emailId", MySqlDbType.VarChar) { Value = ulreq.emailId });
                 pm.Add(new MySqlParameter("active", MySqlDbType.VarChar) { Value = "Y" });
                 pm.Add(new MySqlParameter("approved", MySqlDbType.VarChar) { Value = "A" });
-                pm.Add(new MySqlParameter("Industrialist", MySqlDbType.Int16) { Value = (Int16)UserRole.OnlineUser });
+                pm.Add(new MySqlParameter("Industrialist", MySqlDbType.Int16) { Value = (Int16)UserRole.RowMaterialEntry });
                 pm.Add(new MySqlParameter("forceChangePassword", MySqlDbType.VarChar) { Value = "N" });
                 string query = "";
                 Match match = Regex.Match(ulreq.emailId.ToString(),
                              @"^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$", RegexOptions.IgnoreCase);
                 if (match.Success)
                 {
-                    query = @"SELECT '' AS emp_id,IFNULL(CONCAT(ul.userFirstName,' ',ul.userMiddleName,' ',
-                                ul.userLastName),ul.userName) AS userName,ul.userFirstName,
-                                ul.userMiddleName,ul.userLastName,ul.userId ,ul.userId AS loginId, ul.emailId,ul.password,
+                    query = @"SELECT ul.userName,ul.userId ,ul.userId AS loginId, 
+                                    ul.emailId,ul.password,
                                 ul.forceChangePassword, uc.isDisabled, ul.userRole,
-                                ul.isNationalSingleWindowUser,
-                                IFNULL(TIMESTAMPDIFF(MINUTE, uc.disabledTime, NOW()),0) disabledMinutes, 0 AS openOTP,1 AS isDashboardMigrated
+                                IFNULL(TIMESTAMPDIFF(MINUTE, uc.disabledTime, NOW()),0) disabledMinutes 
+                            
                                  FROM userlogin ul
                                  LEFT JOIN userlogincounter uc ON uc.userId = ul.userId
                                  WHERE ul.isActive = @isActive AND ul.emailId = @emailId ; ";
@@ -796,34 +718,22 @@ namespace ScottmenMainApi.Models.DLayer
                             ltr.isLoginSuccessful = YesNo.Yes;
                             ul.emailId = ulreq.emailId;
                             ul.userName = dt.table.Rows[0]["userName"].ToString();
-                            ul.userFirstName = dt.table.Rows[0]["userFirstName"].ToString();
-                            ul.userMiddleName = dt.table.Rows[0]["userMiddleName"].ToString();
-                            ul.userLastName = dt.table.Rows[0]["userLastName"].ToString();
+
                             ul.forceChangePassword = dt.table.Rows[0]["forceChangePassword"].ToString() == "1";
-                            ul.isNationalSingleWindowUser = dt.table.Rows[0]["isNationalSingleWindowUser"].ToString() == "1";
-                            // ul.userTypeCode = Convert.ToInt16(dt.table.Rows[0]["userTypeCode"].ToString());
+
                             ul.primaryRole = Convert.ToInt16(dt.table.Rows[0]["userRole"].ToString());
-                            ul.openOTP = Convert.ToInt16(dt.table.Rows[0]["openOTP"].ToString());
-                            ul.isDashboardMigrated = Convert.ToInt16(dt.table.Rows[0]["isDashboardMigrated"].ToString());
-                            ul.emp_id = dt.table.Rows[0]["emp_id"].ToString();
                             ul.userId = ltr.userId;
-                            if (ltr.isSingleWindowUser == (Int16)YesNo.Yes) //&& ul.primaryRole==(Int16)UserRole.OnlineUser
-                            {
-                                ul.swsRedirectURL = ltr.swsRedirectURL;
-                                ul.isSingleWindowUser = ltr.isSingleWindowUser;
-                                ul.isDashboardMigrated = (Int16)YesNo.No;
-                            }
                             //Utilities utilities = new Utilities();
                             //ReturnClass.ReturnBool rb1 = Utilities.GetAppSettings("AppSettings", "EncIndustryAESKey");
                             //if (rb1.status)
                             //{
                             //    ul.loginId = utilities.EncryptAES(dt.table.Rows[0]["loginId"].ToString(), rb1.message);
                             //}
-                            ul.userFirstName = ul.userFirstName == string.Empty ? ul.userName! : ul.userFirstName!;
+
                             #region Create JWT Token
                             List<Claim> claims = new();
                             // Possible null reference argument.
-                            claims.Add(new Claim(ClaimTypes.Name, ul.userFirstName, ul.userMiddleName, ul.userLastName));
+                            claims.Add(new Claim(ClaimTypes.Name, ul.userName));
                             claims.Add(new Claim("userId", ltr.userId.ToString()));
                             claims.Add(new Claim("userTypeCode", ul.userTypeCode.ToString()));
                             claims.Add(new Claim(ClaimTypes.Role, ul.primaryRole.ToString()));
@@ -1114,19 +1024,13 @@ namespace ScottmenMainApi.Models.DLayer
                         ul.userMiddleName = dt.table.Rows[0]["userMiddleName"].ToString();
                         ul.userLastName = dt.table.Rows[0]["userLastName"].ToString();
                         ul.forceChangePassword = dt.table.Rows[0]["forceChangePassword"].ToString() == "1";
-                        ul.isNationalSingleWindowUser = dt.table.Rows[0]["isNationalSingleWindowUser"].ToString() == "1";
-                        //ul.userTypeCode = Convert.ToInt16(dt.table.Rows[0]["userTypeCode"].ToString());
+
+
                         ul.primaryRole = Convert.ToInt16(dt.table.Rows[0]["userRole"].ToString());
-                        ul.openOTP = Convert.ToInt16(dt.table.Rows[0]["openOTP"].ToString());
-                        ul.isDashboardMigrated = Convert.ToInt16(dt.table.Rows[0]["isDashboardMigrated"].ToString());
-                        ul.emp_id = dt.table.Rows[0]["emp_id"].ToString();
+
+
                         ul.userId = ltr.userId;
-                        if (ltr.isSingleWindowUser == (Int16)YesNo.Yes) //&& ul.primaryRole==(Int16)UserRole.OnlineUser
-                        {
-                            ul.swsRedirectURL = ltr.swsRedirectURL;
-                            ul.isSingleWindowUser = ltr.isSingleWindowUser;
-                            ul.isDashboardMigrated = (Int16)YesNo.No;
-                        }
+
                         Utilities utilities = new Utilities();
                         ReturnClass.ReturnBool rb1 = Utilities.GetAppSettings("AppSettings", "EncIndustryAESKey");
                         if (rb1.status)
@@ -1134,24 +1038,6 @@ namespace ScottmenMainApi.Models.DLayer
                             ul.loginId = utilities.EncryptAES(dt.table.Rows[0]["loginId"].ToString(), rb1.message);
                         }
 
-                        if ((Int16)UserRole.ServiceProviderDepartmentalUser == ul.primaryRole || (Int16)UserRole.IndustryNodalUser == ul.primaryRole)//&& ul.userTypeCode== (Int16)UserTypeCode.NodalOfficer
-                        {
-                            query = @"SELECT sp.stateId,sp.swsProjectId,sp.districtId,sp.deptNameEnglish,sp.deptNameLocal,sp.deptShortName FROM 
-												swsregisteredprojects sp WHERE sp.officeEmail=@emailId ; ";
-                            dt = await db.ExecuteSelectQueryAsync(query, pm.ToArray());
-                            List<UserProjectResponse> userProjectResponse = new List<UserProjectResponse>();
-                            if (dt.table.Rows.Count > 0)
-                            {
-                                userProjectResponse.Add(new UserProjectResponse());
-                                userProjectResponse[0].stateId = Convert.ToInt16(dt.table.Rows[0]["stateId"].ToString());
-                                userProjectResponse[0].swsProjectId = Convert.ToInt64(dt.table.Rows[0]["swsProjectId"].ToString());
-                                userProjectResponse[0].districtId = Convert.ToInt16(dt.table.Rows[0]["districtId"].ToString());
-                                userProjectResponse[0].deptNameEnglish = dt.table.Rows[0]["deptNameEnglish"].ToString();
-                                userProjectResponse[0].deptNameLocal = dt.table.Rows[0]["deptNameLocal"].ToString();
-                                userProjectResponse[0].deptShortName = dt.table.Rows[0]["deptShortName"].ToString();
-                                ul.userProjectResponse = userProjectResponse;
-                            }
-                        }
 
                         #region Create JWT Token
                         List<Claim> claims = new();
@@ -1454,200 +1340,7 @@ namespace ScottmenMainApi.Models.DLayer
                 return 0;
         }
 
-        /// <summary>
-        /// Send OTP 
-        /// </summary>
-        /// <param name="bl"></param>
-        /// <returns></returns>
-        public async Task<ReturnClass.ReturnString> SendOTP(SendOtp bl)
-        {
-            ReturnClass.ReturnString rs = new();
-            ReturnClass.ReturnBool rb = new ReturnClass.ReturnBool();
 
-            bl.mobileNo = Convert.ToInt64(bl.mobileNo.ToString().Substring(bl.mobileNo.ToString().Length - 10));
-            string mobileno = bl.mobileNo.ToString();
-
-            Match match = Regex.Match(mobileno,
-                              @"^[6-9]\d{9}$", RegexOptions.IgnoreCase);
-            if (match.Success == false)
-            {
-                rs.status = false;
-                rs.message = "Invalid Mobile Number";
-                return rs;
-            }
-            dt = await CheckSMSSendDuration(mobileno, (Int16)SMSSendType.Send);
-            if (dt.status)
-            {
-                rs.status = false;
-                rs.value = dt.value;
-                rs.message = dt.message;
-                if (rs.value.ToString().Trim() != ((Int16)OTPStatus.Expired).ToString().Trim())
-                {
-                    rs.msgId = dt.type;
-                    rs.secondryId = mobileno.ToString();
-                }
-                return rs;
-            }
-            DlCommon dlCommon = new();
-
-            Utilities util = new Utilities();
-            Int64 smsotp = util.GenRandomNumber(4);
-            rs.secondryId = "Your Mobile OTP is " + smsotp.ToString();
-            string smsServiceActive = Utilities.GetAppSettings("sandeshSmsConfig", "isActive").message;
-            string normalSMSServiceActive = Utilities.GetAppSettings("SmsConfiguration", "isActive").message;
-            string EmailServiceActive = Utilities.GetAppSettings("EmailConfiguration", "isActive").message;
-            // Int32 SMSVerificationLimit = Convert.ToInt32(Utilities.GetAppSettings("SmsConfiguration", "SMSVerificationLimit").message) / 60;
-            AlertMessageBody smsbody = new();
-            SandeshResponse rbs = new();
-            ReturnDataTable dtsmstemplate = await dlCommon.GetSMSEmailTemplate((Int32)SmsEmailTemplate.OTPSWS);
-            sandeshMessageBody sandeshMessageBody = new();
-            string smsTemplate = dtsmstemplate.table.Rows[0]["msgBody"].ToString()!;
-            sandeshMessageBody.templateId = Convert.ToInt64(dtsmstemplate.table.Rows[0]["templateId"].ToString()!);
-            if (sandeshMessageBody.templateId > 0)
-            {
-                #region create Parameter To send SMS
-                object[] values = new object[] { smsotp.ToString() };
-                sandeshMessageBody.message = DlCommon.GetFormattedMsg(smsTemplate, values);
-
-                sandeshMessageBody.contact = mobileno;
-                sandeshMessageBody.msgCategory = (Int16)SandeshmsgCategory.Info;
-                sandeshMessageBody.msgPriority = (Int16)SandeshmsgPriority.HighVolatile;
-                smsbody.smsBody = sandeshMessageBody.message;
-                sandeshMessageBody.clientIp = bl.clientIp;
-                sandeshMessageBody.isOTP = true;
-                rs.secondryId = "0";
-                SandeshSms sms = new SandeshSms();
-                #endregion
-                try
-                {
-                    #region Send sansesh SMS
-                    if (smsServiceActive.ToUpper() == "TRUE")
-                        rbs = await sms.callSandeshAPI(sandeshMessageBody);
-                    #endregion
-
-                    #region Send Normal SMS
-                    if (normalSMSServiceActive.ToUpper() == "TRUE")
-                        rbs = await sms.CallSMSAPI(sandeshMessageBody);
-                    #endregion
-
-                    #region Email OTP 
-                    //New code To Send Email From 31.103
-                    if (bl.emailId != string.Empty && EmailServiceActive.ToUpper() == "TRUE")
-                    {
-                        Email em = new();
-                        emailSenderClass emailSenderClass = new();
-                        emailSenderClass.emailSubject = "OTP Verification for SWS Chhattisgarh"!;
-                        emailSenderClass.emailBody = sandeshMessageBody.message!;
-                        emailSenderClass.emailToId = bl.emailId!;
-                        emailSenderClass.emailToName = "";
-                        await em.SendEmailViaURLAsync(emailSenderClass);
-                    }
-                    #endregion
-
-
-                }
-                catch (Exception ex)
-                { }
-            }
-
-            #region Save OTP Details in DB
-            smsbody.OTP = smsotp;
-            smsbody.smsTemplateId = 0;
-            smsbody.isOtpMsg = true;
-            smsbody.applicationId = bl.id == null ? 0 : bl.id;
-            smsbody.mobileNo = bl.mobileNo;
-            smsbody.msgCategory = (Int16)MessageCategory.OTP;
-            smsbody.clientIp = bl.clientIp;
-            smsbody.smsLanguage = LanguageSupported.English;
-            smsbody.emailToReceiver = bl.emailId;
-            smsbody.emailSubject = "OTP Verification";
-            smsbody.messageServerResponse = rbs.status;
-            smsbody.actionId = 1;
-            rb = await dlCommon.SendSmsSaveAsync(smsbody);
-            if (rb.status)
-            {
-                rs.status = true;
-                rs.msgId = rb.message;
-            }
-            #endregion
-
-
-            return rs;
-        }
-
-        /// <summary>
-        /// Re-Send OTP 
-        /// </summary>
-        /// <param name="bl"></param>
-        /// <returns></returns>
-        public async Task<ReturnClass.ReturnString> ReSendOTP(SendOtp bl)
-        {
-            ReturnClass.ReturnString rs = new();
-            ReturnClass.ReturnBool rb = new ReturnClass.ReturnBool();
-            bl.mobileNo = Convert.ToInt64(bl.mobileNo.ToString().Substring(bl.mobileNo.ToString().Length - 10));
-            string mobileno = bl.mobileNo.ToString();
-
-            Match match = Regex.Match(mobileno,
-                              @"^[6-9]\d{9}$", RegexOptions.IgnoreCase);
-            if (match.Success == false)
-            {
-                rs.status = false;
-                rs.message = "Invalid Mobile Number";
-                return rs;
-            }
-            DlCommon dlCommon = new();
-
-            dt = await GetLastOTP(bl.msgId, mobileno.ToString());
-            if (dt != null)
-            {
-                if (dt.status == false)
-                {
-                    rs.status = false;
-                    rs.message = dt.message;
-                    rs.value = dt.value;
-                    return rs;
-                }
-                if (dt.table.Rows.Count > 0)
-                {
-                    rs.secondryId = "Your Mobile OTP is " + dt.table.Rows[0]["msgOtp"].ToString();
-                    string smsServiceActive = Utilities.GetAppSettings("sandeshSmsConfig", "isActive").message;
-                    string normalSMSServiceActive = Utilities.GetAppSettings("SmsConfiguration", "isActive").message;
-                    SandeshResponse rbs = new();
-
-                    #region create Parameter To send SMS
-                    sandeshMessageBody sandeshMessageBody = new();
-                    sandeshMessageBody.contact = mobileno;
-                    sandeshMessageBody.msgCategory = (Int16)SandeshmsgCategory.Info;
-                    sandeshMessageBody.msgPriority = (Int16)SandeshmsgPriority.HighVolatile;
-                    sandeshMessageBody.message = dt.table.Rows[0]["msgBody"].ToString();
-                    sandeshMessageBody.isOTP = true;
-                    sandeshMessageBody.clientIp = bl.clientIp;
-                    ReturnDataTable dtsmstemplate = await dlCommon.GetSMSEmailTemplate((Int32)SmsEmailTemplate.OTPSWS);
-                    sandeshMessageBody.templateId = Convert.ToInt64(dtsmstemplate.table.Rows[0]["templateId"].ToString()!);
-
-                    rs.secondryId = "0";
-                    rs.value = dt.table.Rows[0]["repeatCounter"].ToString();
-                    SandeshSms sms = new SandeshSms();
-                    #endregion
-
-                    #region Send sansesh SMS
-                    if (smsServiceActive.ToUpper() == "TRUE")
-                        rbs = await sms.callSandeshAPI(sandeshMessageBody);
-                    #endregion
-
-                    #region Send Normal SMS
-                    if (normalSMSServiceActive.ToUpper() == "TRUE")
-                        rbs = await sms.CallSMSAPI(sandeshMessageBody);
-                    #endregion
-                    // if (rbs.status.ToString() == "success")
-                    rs.status = true;
-
-                }
-
-            }
-
-            return rs;
-        }
 
 
         /// <summary>
@@ -1837,128 +1530,7 @@ namespace ScottmenMainApi.Models.DLayer
             return dt;
         }
 
-        /// <summary>
-        /// Check whether emailId is registered or not with mobile number
-        /// </summary>        
-        /// <returns>Returns True when Account exists</returns>
-        public async Task<ReturnClass.ReturnString> CheckUserAccountExist(SendOtp sendOtp)
-        {
-            ReturnString rs = new();
-            string query = "";
-            Match match = Regex.Match(sendOtp.emailId!.ToString(),
-                          @"^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$", RegexOptions.IgnoreCase);
-            #region Check User Exists On SWS Chhattisgarh DB
-            if (match.Success)
-            {
 
-                query = @"SELECT u.userId,sp.swsProjectId  AS id,u.userRole ,sp.deptNameEnglish AS Name
-                             FROM userlogin u
-                             JOIN swsregisteredprojects sp ON sp.officeEmail=u.emailId
-                             WHERE u.emailId = @emailId AND sp.nodalOfficerMobile=@mobileNo ; ";
-                MySqlParameter[] pm = new MySqlParameter[]
-                {
-                new MySqlParameter("emailId", MySqlDbType.VarChar) { Value = sendOtp.emailId},
-                new MySqlParameter("mobileNo", MySqlDbType.VarChar) { Value = sendOtp.mobileNo.ToString()},
-                };
-                dt = await db.ExecuteSelectQueryAsync(query, pm);
-                if (dt.table.Rows.Count > 0)
-                {
-                    rs.status = true;
-                    rs.message = "Department Name :" + dt.table.Rows[0]["Name"].ToString();
-                    rs.id = Convert.ToInt64(dt.table.Rows[0]["userId"].ToString());
-                    rs.value = "projects";
-                }
-                else
-                {
-                    query = @"SELECT u.userId,sp.registrationId AS id,u.userRole ,
-                                TRIM(CONCAT(sp.applicantFirstName ,' ', IFNULL(sp.applicantMiddleName,'') ,' ', IFNULL(sp.applicantLastName,''))) AS applicantName ,
-                                sp.applicantFirstName,sp.applicantMiddleName,sp.applicantLastName
-                             FROM userlogin u
-                             JOIN userregistration sp ON sp.emailId=u.emailId AND sp.registrationId=u.userId
-                              WHERE u.emailId =@emailId  AND sp.mobileNo=@mobileNo;";
-                    dt = await db.ExecuteSelectQueryAsync(query, pm);
-                    if (dt.table.Rows.Count > 0)
-                    {
-                        rs.status = true;
-                        rs.message = "Applicant Name :" + dt.table.Rows[0]["applicantName"].ToString();
-                        rs.id = Convert.ToInt64(dt.table.Rows[0]["userId"].ToString());
-                        rs.value = "user";
-                    }
-
-                }
-
-            }
-            #endregion
-            #region Check User Exists On Industry Chhattisgarh DB
-            else
-            {
-                query = @"SELECT  DISTINCT user_name AS userName,ur.applicant_id AS userId ,
-                                 " + (Int16)UserRole.OnlineUser + @"  AS userRole
-                                   FROM  industry_user_registration.user_login l 
-                         INNER JOIN role rl ON rl.Role_Id= l.Role_Id  
-                         INNER jOIN industry_user_registration.userregistration ur ON ur.login_id=l.Login_Id 
-                         WHERE  l.login_id=@emailId  AND  l.Active =@active AND  ur.verified=@active AND ur.applicant_mobile_no=@mobileNo
-                         UNION all
-                         SELECT DISTINCT emp.Emp_Name AS userName, l.Login_Id AS userId, 
-                         " + (Int16)UserRole.IndustryNodalUser + @"  AS userRole
-                         FROM user_login l 
-                         INNER JOIN employees emp ON emp.emp_id = l.Login_Id 
-                         inner JOIN  emp_office_mapping e ON  e.Emp_Id=emp.emp_id AND  e.active=@approved 
-                         inner JOIN  office f ON  f.office_code =e.Office_Code 
-                         INNER JOIN role r ON  r.role_id=l.role_id
-                         WHERE  (l.User_Name=@emailId OR  l.Login_Id =@emailId) 
-                        AND  l.Active =@active  AND emp.Emp_Mobile=@mobileNo ";
-
-                MySqlParameter[] pm = new MySqlParameter[]
-                {
-                new MySqlParameter("emailId", MySqlDbType.VarChar) { Value = sendOtp.emailId},
-                new MySqlParameter("mobileNo", MySqlDbType.VarChar) { Value = sendOtp.mobileNo.ToString()},
-                new MySqlParameter("active", MySqlDbType.VarChar) { Value = "Y"},
-                new MySqlParameter("approved", MySqlDbType.VarChar) { Value = "A"},
-                };
-                dt = await db1.ExecuteSelectQueryAsync(query, pm);
-                if (dt.table.Rows.Count > 0)
-                {
-                    rs.status = true;
-                    rs.id = Convert.ToInt64(dt.table.Rows[0]["userId"].ToString());
-                    if (Convert.ToInt16(dt.table.Rows[0]["userRole"].ToString()) == (Int16)UserRole.IndustryNodalUser)
-                    {
-                        rs.value = "projects";
-                        rs.message = "Department Name :" + dt.table.Rows[0]["userName"].ToString();
-                    }
-                    else
-                    {
-                        rs.value = "user";
-                        rs.message = "Applicant Name :" + dt.table.Rows[0]["userName"].ToString();
-                    }
-                }
-                else
-                {
-
-                    rs.status = false;
-                    rs.message = "Invalid User Details, Either UserId or Mobile No. not matched.";
-                    rs.value = "";
-
-
-                }
-            }
-            #endregion
-            if (rs.status)
-            {
-                sendOtp.msgType = " forgot password in ";
-                ReturnString rs1 = await SendOTP(sendOtp);
-                if (rs1.status)
-                    rs.msgId = rs1.msgId;
-                else
-                {
-                    rs.value = rs1.value;
-                    rs.msgId = rs1.msgId;
-                    rs.secondryId = rs1.secondryId;
-                }
-
-            }
-            return rs;
-        }
 
         public async Task<ReturnClass.ReturnBool> ResetForgotPassword(BlUser bl)
         {
@@ -2076,14 +1648,14 @@ namespace ScottmenMainApi.Models.DLayer
             else
             {
                 query = @"SELECT  DISTINCT user_name AS userName,ur.applicant_id AS userId ,
-                                " + (Int16)UserRole.OnlineUser + @" AS userRole, ur.applicant_mobile_no AS mobileNo
+                                " + (Int16)UserRole.GateKeeper + @" AS userRole, ur.applicant_mobile_no AS mobileNo
                                   FROM  industry_user_registration.user_login l 
                         INNER JOIN role rl ON rl.Role_Id= l.Role_Id  
                         INNER jOIN industry_user_registration.userregistration ur ON ur.login_id=l.Login_Id 
                         WHERE  l.login_id=@emailId  AND  l.Active =@active AND ur.verified=@active AND ur.login_id=@userId 
                         UNION all
                         SELECT DISTINCT emp.Emp_Name AS userName, l.Login_Id AS userId, 
-                          " + (Int16)UserRole.IndustryNodalUser + @"  AS userRole, emp.Emp_Mobile AS mobileNo
+                          " + (Int16)UserRole.GateKeeper + @"  AS userRole, emp.Emp_Mobile AS mobileNo
                         FROM user_login l 
                         INNER JOIN employees emp ON emp.emp_id = l.Login_Id 
                         inner JOIN  emp_office_mapping e ON  e.Emp_Id=emp.emp_id AND  e.active=@approved
@@ -2113,7 +1685,7 @@ namespace ScottmenMainApi.Models.DLayer
                 SendOtp sendOtp = new();
                 sendOtp.mobileNo = Convert.ToInt64(rs.secondryId);
                 sendOtp.msgType = " Login ";
-                ReturnString rs1 = await SendOTP(sendOtp);
+                ReturnString rs1 = new();//await SendOTP(sendOtp);
                 if (rs1.status)
                     rs.msgId = rs1.msgId;
                 else
@@ -3133,7 +2705,7 @@ namespace ScottmenMainApi.Models.DLayer
                     string passwordTbl = dt.table.Rows[0]["password"].ToString();
                     if (bl.oldPassword == passwordTbl)
                     {
-                        if (bl.roleId == (Int16)UserRole.OnlineUser)
+                        if (bl.roleId == (Int16)UserRole.GateKeeper)
                         {
                             query2 = @"INSERT INTO industry_user_registration.user_login_log
                                       SELECT * FROM industry_user_registration.user_login l
@@ -3200,12 +2772,12 @@ namespace ScottmenMainApi.Models.DLayer
                   new MySqlParameter("clientIp", MySqlDbType.VarChar) { Value = bl.clientIp},
                 };
 
-                query = @"SELECT  DISTINCT  l.isUserMigrate ," + (Int16)UserRole.OnlineUser + @" AS userRole
+                query = @"SELECT  DISTINCT  l.isUserMigrate ," + (Int16)UserRole.GateKeeper + @" AS userRole
                             FROM  industry_user_registration.user_login l                            
                             INNER jOIN industry_user_registration.userregistration ur ON ur.login_id=l.Login_Id
                             WHERE  l.login_id=@loginId  AND  l.Active =@active AND  ur.verified=@active 
                             UNION ALL
-                            SELECT  l.isUserMigrate ," + (Int16)UserRole.IndustryNodalUser + @" AS userRole
+                            SELECT  l.isUserMigrate ," + (Int16)UserRole.GateKeeper + @" AS userRole
                             FROM user_login l                            
                             WHERE  (l.User_Name=@loginId OR  l.Login_Id =@loginId) AND  l.Active =@active ; ";
 
@@ -3214,7 +2786,7 @@ namespace ScottmenMainApi.Models.DLayer
                 dt = await db1.ExecuteSelectQueryAsync(query, pm.ToArray());
                 if (dt.table.Rows.Count > 0)
                 {
-                    if (Convert.ToInt16(dt.table.Rows[0]["userRole"].ToString()) == (Int16)UserRole.OnlineUser)
+                    if (Convert.ToInt16(dt.table.Rows[0]["userRole"].ToString()) == (Int16)UserRole.GateKeeper)
                     {
                         query2 = @"INSERT INTO industry_user_registration.user_login_log
                                       SELECT * FROM industry_user_registration.user_login l
@@ -3308,7 +2880,7 @@ namespace ScottmenMainApi.Models.DLayer
             //{
             if (sendOtp.loginFor == 1) // New Industrialist
                 query = @"SELECT  DISTINCT user_name AS userName, ur.login_id AS userId,ur.email_id as emailId,
-                                 " + (Int16)UserRole.OnlineUser + @"  AS userRole
+                                 " + (Int16)UserRole.GateKeeper + @"  AS userRole
                               FROM  industry_user_registration.user_login l 
                     INNER JOIN role rl ON rl.Role_Id= l.Role_Id    
                     INNER jOIN industry_user_registration.userregistration ur ON ur.login_id=l.Login_Id 
@@ -3316,7 +2888,7 @@ namespace ScottmenMainApi.Models.DLayer
 
             else if (sendOtp.loginFor == 2) //InternalDepartmentUser
                 query = @" SELECT DISTINCT emp.Emp_Name AS userName, l.Login_Id AS userId, emp.Emp_Email_Id as emailId, 
-                  " + (Int16)UserRole.IndustryNodalUser + @"  AS userRole
+                  " + (Int16)UserRole.GateKeeper + @"  AS userRole
                   FROM user_login l 
                   INNER JOIN employees emp ON emp.emp_id = l.Login_Id 
                   inner JOIN  emp_office_mapping e ON  e.Emp_Id=emp.emp_id AND  e.active=@approved 
@@ -3337,7 +2909,7 @@ namespace ScottmenMainApi.Models.DLayer
                 rs.status = true;
                 rs.secondryId = dt.table.Rows[0]["userId"].ToString();
                 rs.value = dt.table.Rows[0]["emailId"].ToString();
-                if (Convert.ToInt16(dt.table.Rows[0]["userRole"].ToString()) == (Int16)UserRole.IndustryNodalUser)
+                if (Convert.ToInt16(dt.table.Rows[0]["userRole"].ToString()) == (Int16)UserRole.GateKeeper)
                 {
                     rs.message = "Department Name :" + dt.table.Rows[0]["userName"].ToString();
                 }
@@ -3358,7 +2930,7 @@ namespace ScottmenMainApi.Models.DLayer
             if (rs.status)
             {
                 sendOtp.msgType = " forgot userId in ";
-                ReturnString rs1 = await SendOTP(sendOtp);
+                ReturnString rs1 = new();//await SendOTP(sendOtp);
                 if (rs1.status)
                     rs.msgId = rs1.msgId;
                 else
@@ -3511,7 +3083,7 @@ namespace ScottmenMainApi.Models.DLayer
                         emailSenderClass.emailBody = sandeshMessageBody.message!;
                         emailSenderClass.emailToId = bl.emailId!;
                         emailSenderClass.emailToName = "";
-                        await em.SendEmailViaURLAsync(emailSenderClass);
+                        //await em.SendEmailViaURLAsync(emailSenderClass);
                     }
                     #endregion
 
@@ -3792,8 +3364,9 @@ namespace ScottmenMainApi.Models.DLayer
             query = @"SELECT e.empCode,e.firstName,e.lastName,e.contactNumber,e.email,DATE_FORMAT(e.dob,'%d/%m/%Y') AS dob,
                             e.gender,e.nationality,DATE_FORMAT( e.joiningDate,'%d/%m/%Y') AS joiningDate,e.shift,e.department,
                             e.bloodGroup,e.emergencyContact1,e.emergencyContact2,e.address,
-                            e.country,e.state,e.city,e.zipcode 
+                            e.country,e.state,e.city,e.zipcode ,IFNULL(u.isActive,0) AS isActive,IFNULL(u.userRole,0) AS userRole 
                              FROM employeemaster e 
+                        LEFT JOIN userlogin u ON u.userId=e.empCode 
                            WHERE e.active=@active ";
             if (empCode != 0)
                 query += @" AND e.empCode=@empCode ";
@@ -5905,10 +5478,10 @@ namespace ScottmenMainApi.Models.DLayer
         {
             string query1 = @"insert into blendingmaster (batchId,containerId,containerName,brandId,brandName,
                                                     totalQuantity,balanceQuantity,unitId,unitName,remark,
-                                                startDate,active,clientIp,userId)
+                                                startDate,active,clientIp,userId,density)
                                   values (@batchId,@containerId,@containerName,@brandId,@brandName,
                                             @totalQuantity,@balanceQuantity,@unitId,@unitName,@remark,
-                                            NOW(),@active,@clientIp,@userId)";
+                                            NOW(),@active,@clientIp,@userId,@density)";
             string query = "";
             //blending.totalQuantity = blending.blendingItems.Where(x => x.applicationFor == 1).Sum(x => x.equipmentCount);
             blending.totalQuantity = blending.blendingItems.Sum(x => x.quantity);
@@ -5929,6 +5502,7 @@ namespace ScottmenMainApi.Models.DLayer
               new MySqlParameter("@active", MySqlDbType.Int16) { Value = blending.active},
                new MySqlParameter("@userId", MySqlDbType.Int64) { Value = blending.userId},
                 new MySqlParameter("@clientIp", MySqlDbType.String) { Value = blending.clientIp},
+                new MySqlParameter("@density", MySqlDbType.Decimal) { Value = blending.density},
           };
             List<MySqlParameter> pm = new();
             query = @"insert into blendingitem (batchId,itemId,itemName,quantity,
@@ -6075,7 +5649,7 @@ namespace ScottmenMainApi.Models.DLayer
             query = @"SELECT bm.batchId,bm.containerId,bm.containerName,bm.brandId,bm.brandName,
                             bm.totalQuantity,bm.balanceQuantity,bm.unitId,bm.unitName,bm.remark,
                             bm.startDate,
-                            bm.endDate,bm.emptyDate
+                            bm.endDate,bm.emptyDate,bm.density
                              FROM blendingmaster bm 
                             WHERE bm.active=@active " + WHERE + "  ORDER BY bm.batchId DESC ";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
@@ -7696,8 +7270,259 @@ namespace ScottmenMainApi.Models.DLayer
             return pivotTable;
         }
 
+        #region Mail template
+
+        public async Task<ReturnClass.ReturnBool> SaveMailTemplate(MailTemplate mailTemplate)
+        {
+            string query = @"insert into mailtemplate (templateName,vendorId,vendorName,itemId,itemName,mailBody,active,clientIp,userId)
+                                  values             (@templateName,@vendorId,@vendorName,@itemId,@itemName,@mailBody,@active,@clientIp,@userId)";
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+             // new MySqlParameter("@templateId", MySqlDbType.Int64) { Value = mailTemplate.templateId},
+              new MySqlParameter("@templateName", MySqlDbType.VarChar) { Value = mailTemplate.templateName},
+              new MySqlParameter("@vendorId", MySqlDbType.Int64) { Value = mailTemplate.vendorId},
+              new MySqlParameter("@vendorName", MySqlDbType.VarChar) { Value = mailTemplate.vendorName},
+              new MySqlParameter("@itemId", MySqlDbType.Int64) { Value = mailTemplate.itemId},
+               new MySqlParameter("@itemName", MySqlDbType.VarChar) { Value = mailTemplate.itemName},
+               new MySqlParameter("@mailBody", MySqlDbType.VarChar) { Value = mailTemplate.mailBody},
+              new MySqlParameter("@active", MySqlDbType.Int16) { Value = (Int16)YesNo.Yes},
+               new MySqlParameter("@userId", MySqlDbType.Int64) { Value = mailTemplate.userId},
+                new MySqlParameter("@clientIp", MySqlDbType.String) { Value = mailTemplate.clientIp}
+                 };
+
+            return await db.ExecuteQueryAsync(query, pm.ToArray(), "SaveMailTemplate");
+        }
+        public async Task<ReturnClass.ReturnBool> UpdateMailTemplate(MailTemplate mailTemplate)
+        {
+            string query = @"UPDATE mailtemplate SET vendorId=@vendorId,vendorName=@vendorName
+                                                ,itemId=@itemId,itemName=@itemName,mailBody=@mailBody,clientIp=@clientIp,userId=@userId WHERE 
+                                                  templateId=@templateId ";
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+              new MySqlParameter("@templateId", MySqlDbType.Int64) { Value = mailTemplate.templateId},
+              new MySqlParameter("@vendorId", MySqlDbType.Int64) { Value = mailTemplate.vendorId},
+              new MySqlParameter("@vendorName", MySqlDbType.VarChar) { Value = mailTemplate.vendorName},
+              new MySqlParameter("@itemId", MySqlDbType.Int64) { Value = mailTemplate.itemId},
+               new MySqlParameter("@itemName", MySqlDbType.VarChar) { Value = mailTemplate.itemName},
+               new MySqlParameter("@mailBody", MySqlDbType.VarChar) { Value = mailTemplate.mailBody},
+              new MySqlParameter("@active", MySqlDbType.Int16) { Value = mailTemplate.active},
+               new MySqlParameter("@userId", MySqlDbType.Int64) { Value = mailTemplate.userId},
+                new MySqlParameter("@clientIp", MySqlDbType.String) { Value = mailTemplate.clientIp}
+                 };
+
+            return await db.ExecuteQueryAsync(query, pm.ToArray(), "UpdateMailTemplate");
+        }
+        /// <summary>
+        /// 
+        /// Get Get Template
+        /// </summary>
+        /// <returns></returns>
+        public async Task<ReturnDataTable> GetMailTemplate(MailTemplate mailTemplate)
+        {
+            string query = "";
+            ReturnDataSet ds = new();
+            mailTemplate.templateId = mailTemplate.templateId == null ? 0 : mailTemplate.templateId;
+            mailTemplate.vendorId = mailTemplate.vendorId == null ? 0 : mailTemplate.vendorId;
+            mailTemplate.itemId = mailTemplate.itemId == null ? 0 : mailTemplate.itemId;
+            MySqlParameter[] pm = new MySqlParameter[]
+           {
+               new MySqlParameter("templateId", MySqlDbType.Int32) { Value = mailTemplate.templateId},
+               new MySqlParameter("vendorId", MySqlDbType.Int64) { Value = mailTemplate.vendorId},
+               new MySqlParameter("itemId", MySqlDbType.Int64) { Value = mailTemplate.itemId},
+               new MySqlParameter("active", MySqlDbType.Int16) { Value = (Int16)YesNo.Yes},
+           };
+            String WHERE = "";
+            string selectCondition = "";
+            if (mailTemplate.templateId > 0)
+            {
+                WHERE += @" AND m.templateId=@templateId ";
+                selectCondition = ",m.mailBody";
+            }
+            if (mailTemplate.itemId > 0)
+                WHERE += @" AND m.itemId=@itemId ";
+            if (mailTemplate.vendorId > 0)
+                WHERE += @" AND m.vendorId=@vendorId ";
+
+
+            //if (string.IsNullOrEmpty(WHERE))
+            //{
+            //    //dt.status = false;
+            //    //dt.message = "Invalid Parameters";
+            //    //return dt;
+
+            //}
+
+            query = @"SELECT m.templateId,m.templateName,m.vendorId,m.vendorName,m.itemId,m.itemName" + selectCondition + @"
+                        FROM mailtemplate m
+                        WHERE  m.active=@active
+                         " + WHERE + " ORDER BY m.creationTimeStamp DESC;";
+            dt = await db.ExecuteSelectQueryAsync(query, pm);
+            if (dt.table.Rows.Count == 0)
+                dt.status = false;
+            return dt;
+        }
+        #endregion
+        #region Purchase Order
+
+        public async Task<ReturnClass.ReturnBool> SavePurchaseOrder(PurchaseOrder purchaseOrder)
+        {
+            string query = @"insert into purchaseorder (purchaseOrderId,vendorId,itemId,quantity,active,clientIp,userId)
+                                  values (@purchaseOrderId,@vendorId,@itemId,@quantity,@active,@clientIp,@userId)";
+            purchaseOrder.purchaseOrderId = await GeneratePurchaseOrderID();
+            if (purchaseOrder.purchaseOrderId == 0)
+            {
+                ReturnClass.ReturnBool rb1 = new();
+                rb1.message = "Something Went Wrong Please Try After Some Time!";
+                return rb1;
+            }
+
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+              new MySqlParameter("@purchaseOrderId", MySqlDbType.Int64) { Value = purchaseOrder.purchaseOrderId},
+              new MySqlParameter("@vendorId", MySqlDbType.Int64) { Value = purchaseOrder.vendorId},
+              new MySqlParameter("@itemId", MySqlDbType.Int64) { Value = purchaseOrder.itemId},
+              new MySqlParameter("@quantity", MySqlDbType.Decimal) { Value = purchaseOrder.quantity},
+              new MySqlParameter("@active", MySqlDbType.Int16) { Value = (Int16)YesNo.Yes},
+               new MySqlParameter("@userId", MySqlDbType.Int64) { Value = purchaseOrder.userId},
+                new MySqlParameter("@clientIp", MySqlDbType.String) { Value = purchaseOrder.clientIp}
+                 };
+
+            return await db.ExecuteQueryAsync(query, pm.ToArray(), "SavePurchaseOrder");
+        }
+        public async Task<ReturnClass.ReturnBool> UpdatePurchaseOrder(PurchaseOrder purchaseOrder)
+        {
+            string query = @"INSERT INTO purchaseorderlog
+                                        SELECT * FROM purchaseorder
+                                        WHERE purchaseOrderId=@purchaseOrderId ";
+            ReturnBool returnBool = new();
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+              new MySqlParameter("@purchaseOrderId", MySqlDbType.Int64) { Value = purchaseOrder.purchaseOrderId},
+              new MySqlParameter("@vendorId", MySqlDbType.Int64) { Value = purchaseOrder.vendorId},
+              new MySqlParameter("@itemId", MySqlDbType.Int64) { Value = purchaseOrder.itemId},
+              new MySqlParameter("@quantity", MySqlDbType.Decimal) { Value = purchaseOrder.quantity},
+              //new MySqlParameter("@active", MySqlDbType.Int16) { Value = purchaseOrder.active},
+               new MySqlParameter("@userId", MySqlDbType.Int64) { Value = purchaseOrder.userId},
+                new MySqlParameter("@clientIp", MySqlDbType.String) { Value = purchaseOrder.clientIp}
+                 };
+            using (TransactionScope ts = new(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                returnBool = await db.ExecuteQueryAsync(query, pm.ToArray(), "InsertPurchaseOrderlog");
+
+                if (returnBool.status)
+                {
+                    query = @"UPDATE purchaseorder SET vendorId=@vendorId,
+                                                    itemId=@itemId,quantity=@quantity,clientIp=@clientIp,userId=@userId WHERE 
+                                                  purchaseOrderId=@purchaseOrderId ";
+                    returnBool = await db.ExecuteQueryAsync(query, pm.ToArray(), "UpdatePurchaseOrder");
+                }
+                if (returnBool.status)
+                    ts.Complete();
+            }
+            return returnBool;
+        }
+        /// <summary>
+        /// Returns Generate Purchase Order ID 9+DDMM + NNN
+        /// </summary>
+        /// <returns></returns>
+        private async Task<Int32> GeneratePurchaseOrderID()
+        {
+            ReturnClass.ReturnString rs = new();
+            Int32 id = 0;
+            string query = @"SELECT IFNULL(MAX(SUBSTRING(e.purchaseOrderId,6,8)),0) + 1 AS  purchaseOrderId
+                             FROM purchaseorder e;";
+
+            dt = await db.ExecuteSelectQueryAsync(query);
+            if (dt.table.Rows.Count > 0)
+            {
+                string ids = ((int)PrefixId.PurchaseOrder).ToString() + DateTime.Now.ToString("yyMM") + dt.table.Rows[0]["purchaseOrderId"].ToString()!.PadLeft(3, '0');
+                id = Convert.ToInt32(ids);
+            }
+            return id;
+        }
+        /// <summary>
+        /// 
+        /// Get Get Template
+        /// </summary>
+        /// <returns></returns>
+        public async Task<ReturnDataTable> GetPurchaseOrder(PurchaseOrder purchaseOrder)
+        {
+            string query = "";
+            ReturnDataSet ds = new();
+            purchaseOrder.purchaseOrderId = purchaseOrder.purchaseOrderId == null ? 0 : purchaseOrder.purchaseOrderId;
+            purchaseOrder.vendorId = purchaseOrder.vendorId == null ? 0 : purchaseOrder.vendorId;
+            purchaseOrder.itemId = purchaseOrder.itemId == null ? 0 : purchaseOrder.itemId;
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+              new MySqlParameter("@purchaseOrderId", MySqlDbType.Int64) { Value = purchaseOrder.purchaseOrderId},
+              new MySqlParameter("@vendorId", MySqlDbType.Int64) { Value = purchaseOrder.vendorId},
+              new MySqlParameter("@itemId", MySqlDbType.Int64) { Value = purchaseOrder.itemId},
+
+                 };
+            String WHERE = "";
+            if (purchaseOrder.purchaseOrderId > 0)
+                WHERE += @" AND m.purchaseOrderId=@purchaseOrderId ";
+            if (purchaseOrder.vendorId > 0)
+                WHERE += @" AND m.vendorId=@vendorId ";
+            if (purchaseOrder.itemId > 0)
+                WHERE += @" AND m.itemId=@itemId ";
+
+            //if (string.IsNullOrEmpty(WHERE))
+            //{
+            //    dt.status = false;
+            //    dt.message = "Invalid Parameters";
+            //    return dt;
+            //}
+
+            query = @"SELECT m.purchaseOrderId,m.vendorId,v.vendorName,m.itemId,i.itemName,i.shortName,m.quantity
+                        FROM purchaseorder m
+                        JOIN vendormaster v ON v.vendorId=m.vendorId
+                        JOIN itemmaster i ON  i.itemId=m.itemId
+                        WHERE  m.active=@active
+                         " + WHERE + " ORDER BY m.creationTimeStamp DESC;";
+            dt = await db.ExecuteSelectQueryAsync(query, pm);
+            if (dt.table.Rows.Count == 0)
+                dt.status = false;
+            return dt;
+        }
+        #endregion
+
+        public async Task<ReturnBool> SaveMailedData(SendMailAddress sendMailAddress, bool status)
+        {
+            AlertMessageBody smsbody = new();
+
+            smsbody.OTP = 0;
+            smsbody.smsTemplateId = 1;
+            smsbody.isOtpMsg = true;
+            smsbody.applicationId = 0;
+            smsbody.mobileNo = 0;
+            smsbody.msgCategory = (Int16)MessageCategory.OTP;
+            smsbody.clientIp = sendMailAddress.clientIp;
+            smsbody.smsLanguage = LanguageSupported.English;
+            smsbody.emailToReceiver = sendMailAddress.ToAddress;
+            smsbody.emailSubject = sendMailAddress.emailSubject;
+            smsbody.messageServerResponse = status == true ? "Success" : "Failed";
+            smsbody.actionId = 1;
+
+            smsbody.msgId = await dlCommon.GenerateSMSMsgId();
+            try
+            {
+                rb = await dlCommon.SendEmailSaveAsync(smsbody);
+
+            }
+            catch (Exception ex)
+            {
+                WriteLog.Error("SaveMailedData - DlUser: \n   error - ", ex);
+
+            }
+            return rb;
+
+        }
+
 
     }
+
+
 
 
 }

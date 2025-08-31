@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Transactions;
 using static BaseClass.ReturnClass;
 using static ScottmenMainApi.Models.BLayer.BlCommon;
 using ListValue = BaseClass.ListValue;
@@ -728,9 +729,9 @@ namespace ScottmenMainApi.Models.DLayer
             return rb;
         }
 
-       
 
-       
+
+
         public Task<string> GetSwsServiceAPIUrl()
         {
             string buildType = Utilities.GetCurrentBuild();
@@ -1040,7 +1041,7 @@ namespace ScottmenMainApi.Models.DLayer
                 emailSenderClass.emailBody = bl.message!;
                 emailSenderClass.emailToId = bl.emailId!;
                 emailSenderClass.emailToName = "";
-                await em.SendEmailViaURLAsync(emailSenderClass);
+               // await em.SendEmailViaURLAsync(emailSenderClass);
                 #region Send OTP
                 smsbody.OTP = 0;
                 smsbody.smsTemplateId = 1;
@@ -1125,7 +1126,7 @@ namespace ScottmenMainApi.Models.DLayer
                 emailSenderClass.emailBody = bl.message!;
                 emailSenderClass.emailToId = bl.emailId!;
                 emailSenderClass.emailToName = "";
-                await em.SendEmailViaURLAsync(emailSenderClass);
+                //await em.SendEmailViaURLAsync(emailSenderClass);
                 //
                 #region Send OTP
                 smsbody.OTP = 0;
@@ -1293,7 +1294,7 @@ namespace ScottmenMainApi.Models.DLayer
         }
 
 
-       
+
 
         /// <summary>
         ///Get Category List from ddlCat
@@ -1475,7 +1476,7 @@ namespace ScottmenMainApi.Models.DLayer
             {
                      new MySqlParameter("userId",MySqlDbType.Int64) { Value = userId},
             };
-            dt = await db.ExecuteSelectQueryAsync(query, pm,DBConnectionList.TransactionIndustryDB);
+            dt = await db.ExecuteSelectQueryAsync(query, pm, DBConnectionList.TransactionIndustryDB);
             Int32 officeCode = Convert.ToInt32(dt.table.Rows[0]["Office_Code"].ToString());
             query = @" select e.Emp_Id AS id , e.Emp_Name AS name
                         FROM employees e
@@ -1499,7 +1500,7 @@ namespace ScottmenMainApi.Models.DLayer
         public async Task<List<ListData>> GetCommonListChartAsync(string category, LanguageSupported language)
         {
             string fieldLanguage = language == LanguageSupported.Hindi ? "Local" : "English";
-            
+
             string query = @"SELECT d.id AS id, d.name" + fieldLanguage + @" AS name,d.grouping as extraField,
                                     d.remark AS label
                                  FROM ddlcatlist d
@@ -1517,6 +1518,183 @@ namespace ScottmenMainApi.Models.DLayer
             List<ListData> lv = Helper.GetGenericlist(dt.table);
             return lv;
         }
+
+        #region Create User
+        /// <summary>
+        /// Generate Event Log
+        /// </summary>
+        /// <param name="el"></param>
+        /// <returns></returns>
+        public async Task<ReturnBool> SaveUserLogin(UserLogin el)
+        {
+            bool userExist = await GetUserExist(el.userId);
+            string modificationType = "User Create";
+            if (userExist)
+                modificationType = "User Update";
+
+            string query = @" INSERT INTO userlogin (userName, userId, emailId, password, forceChangePassword, 
+                                    isActive, clientIp, creationTimeStamp, modificationType, 
+                                userTypeCode, userRole, registrationYear)
+                                    VALUES 
+                                (@userName,@userId,@emailId,@password,@forceChangePassword,
+                                @isActive,@clientIp,NOW(),@modificationType,
+                                  @userTypeCode,@userRole,@registrationYear); ";
+            el.isActive = el.isActive == null ? (Int16)IsActive.Yes : el.isActive;
+            MySqlParameter[] pm = new MySqlParameter[]
+            {
+                new MySqlParameter("userName", MySqlDbType.VarChar) { Value = el.userName },
+                new MySqlParameter("userId", MySqlDbType.Int64) { Value = el.userId },
+                new MySqlParameter("emailId", MySqlDbType.VarChar) { Value = el.emailId },
+                new MySqlParameter("password", MySqlDbType.VarChar) { Value = el.password },
+                new MySqlParameter("forceChangePassword", MySqlDbType.Int16) { Value =(Int16) YesNo.No },
+                new MySqlParameter("isActive", MySqlDbType.Int16) { Value =el.isActive},
+                new MySqlParameter("modificationType", MySqlDbType.VarChar) { Value = modificationType },
+                new MySqlParameter("clientIp", MySqlDbType.VarChar) { Value = el.clientIp },
+                new MySqlParameter("userTypeCode", MySqlDbType.Int16) { Value = 0},
+                new MySqlParameter("userRole", MySqlDbType.Int16) { Value = el.userRole},
+                new MySqlParameter("registrationYear", MySqlDbType.Int32) { Value =DateTime.Now.Year},
+            };
+            using (TransactionScope ts = new(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                if (userExist)
+                    rb = await DeleteExistingUser(el.userId);
+                else
+                    rb.status = true;
+                if (rb.status)
+                {
+                    rb = await db.ExecuteQueryAsync(query, pm, "CreateUser");
+                    if (rb.status)
+                        ts.Complete();
+                }
+            }
+            return rb;
+        }
+
+        /// <summary>
+        /// Active/Inactive User Login
+        /// </summary>
+        /// <param name="el"></param>
+        /// <returns></returns>
+        public async Task<ReturnBool> UserActivation(UserLogin el)
+        {
+            string query = @" INSERT INTO userloginlog
+                            SELECT * FROM userlogin WHERE  userId =@userId ";
+            MySqlParameter[] pm = new MySqlParameter[]
+            {
+
+                new MySqlParameter("userId", MySqlDbType.Int64) { Value = el.userId },
+                new MySqlParameter("isActive", MySqlDbType.Int16) { Value =el.isActive},
+                new MySqlParameter("clientIp", MySqlDbType.VarChar) { Value = el.clientIp },
+
+            };
+            using (TransactionScope ts = new(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                rb = await db.ExecuteQueryAsync(query, pm, "SaveUserloginLog");
+                if (rb.status)
+                {
+                    query = @" UPDATE userlogin 
+                            SET isActive=@isActive ,clientIp=@clientIp
+                            WHERE  userId =@userId";
+                    rb = await db.ExecuteQueryAsync(query, pm, "UserActive_Deactive");
+                    if (rb.status)
+                    {
+                        ts.Complete();
+                    }
+                }
+                return rb;
+            }
+        }
+
+        public async Task<ReturnBool> DeleteExistingUser(Int64 userId)
+        {
+            string query = @" INSERT INTO userloginlog
+                            SELECT * FROM userlogin WHERE  userId =@userId ";
+
+            MySqlParameter[] pm = new MySqlParameter[]
+            {
+                new MySqlParameter("userId", MySqlDbType.Int64) { Value = userId },
+
+            };
+
+            rb = await db.ExecuteQueryAsync(query, pm, "SaveUserloginLog");
+            if (rb.status)
+            {
+
+                query = @" DELETE FROM userlogin                             
+                            WHERE  userId =@userId";
+                rb = await db.ExecuteQueryAsync(query, pm, "DeleteUser");
+            }
+            return rb;
+        }
+
+        public async Task<bool> GetUserExist(Int64 userId)
+        {
+            bool userExists = false;
+            string query = @"SELECT userId FROM userlogin WHERE  userId =@userId ";
+            MySqlParameter[] pm = new MySqlParameter[]
+            {
+                     new MySqlParameter("userId",MySqlDbType.Int64) { Value = userId},
+            };
+            dt = await db.ExecuteSelectQueryAsync(query, pm);
+            if (dt.table.Rows.Count > 0)
+                userExists = true;
+            return userExists;
+        }
+        public async Task<ReturnDataTable> GetUserList()
+        {
+
+            string query = @"SELECT u.userName, u.userId, u.emailId,
+                                    u.isActive,u.userRole,d.nameEnglish AS userRoleName
+                                FROM userlogin  u
+                                JOIN ddlcatlist d ON d.id=u.userRole AND d.category=@category
+                                WHERE u.userRole!=@admin";
+            MySqlParameter[] pm = new MySqlParameter[]
+            {   new MySqlParameter("category",MySqlDbType.Int64) { Value = "userRole"},
+              new MySqlParameter("admin",MySqlDbType.Int16) { Value = (Int16)UserRole.Administrator},
+            };
+            dt = await db.ExecuteSelectQueryAsync(query, pm);
+            dt.status = false;
+            if (dt.table.Rows.Count > 0)
+                dt.status = true;
+            return dt;
+        }
+
+        /// <summary>
+        /// Active/Inactive User Login
+        /// </summary>
+        /// <param name="el"></param>
+        /// <returns></returns>
+        public async Task<ReturnBool> ResetPassword(UserLogin el)
+        {
+            string query = @" INSERT INTO userloginlog
+                            SELECT * FROM userlogin WHERE  userId =@userId ";
+
+            MySqlParameter[] pm = new MySqlParameter[]
+            {
+
+                new MySqlParameter("userId", MySqlDbType.Int64) { Value = el.userId },
+                new MySqlParameter("password", MySqlDbType.Int16) { Value =el.password},
+                new MySqlParameter("modificationType", MySqlDbType.VarChar) { Value = "Password Reset" },
+                new MySqlParameter("clientIp", MySqlDbType.VarChar) { Value = el.clientIp },
+
+            };
+            using (TransactionScope ts = new(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                rb = await db.ExecuteQueryAsync(query, pm, "SaveUserloginLog");
+                if (rb.status)
+                {
+                    query = @" UPDATE userlogin 
+                            SET password=@password,modificationType=@modificationType ,clientIp=@clientIp
+                            WHERE  userId =@userId";
+
+                    rb = await db.ExecuteQueryAsync(query, pm, "ResetPassword");
+                    if (rb.status)
+                    { ts.Complete(); }
+                }
+            }
+            return rb;
+        }
+        #endregion
 
     }
 }

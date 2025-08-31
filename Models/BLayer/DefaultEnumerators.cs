@@ -60,9 +60,10 @@
         Visitor = 1,
         Unloading = 2,
         Loading = 3,
-        MaterialIssue = 4,        
+        MaterialIssue = 4,
         Employee = 6,
         Dispatch = 7,
+        PurchaseOrder = 9,
     }
     public enum LoginSource
     {
@@ -98,7 +99,8 @@
     public enum UserRole
     {
         Administrator = 1,
-        DIC_GM = 2,
+        FL9User = 2,
+        ProductionSupervisor = 3,
         /// <summary>
         /// Service Provider/ Integrated Department User
         /// </summary>
@@ -106,35 +108,19 @@
         /// <summary>
         /// Nodal / Industry Department Main User.
         /// </summary>
-        OnlineUser = 4,
+        BlenderUser = 4,
         /// <summary>
         /// Internal Department (In house Development).
         /// </summary>
-        DICDEO = 5,
+        RowMaterialEntry = 5,
         /// <summary>
         /// NIC Admin.
         /// </summary>
-        ReportAdmin = 6,
-        SIPBDirector = 7,
-        DirectorateDeo = 8,
-        DeputyDirector = 9,
-        Inspector = 10,
-        ChiefGeneralManager = 11,
-        AssistantManager = 13,
-        Manager = 14,
-        JointDirector = 15,
-        AdditionalDirector = 16,
-        AssistantDirector = 17,
-        HelpDesk = 19,
-        //Secretary = 20,
-        ManagingDirectorCSIDC = 21,
-        StartupDealingAssistant = 22,
-        Secretary25 = 25,
-        ServiceProviderDepartmentalUser = 26,
-        IndustryNodalUser = 27,
+        GateKeeper = 6
+
 
     }
-   
+
     public enum UserTypeCode
     {
         NotApplicable = 0,

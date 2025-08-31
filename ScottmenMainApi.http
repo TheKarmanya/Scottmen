@@ -1,4 +1,4 @@
-@ScottmenMainApi_HostAddress = http://localhost:5236
+@ScottmenMainApi_HostAddress = https://localhost:5236
 
 GET {{ScottmenMainApi_HostAddress}}/weatherforecast/
 Accept: application/json

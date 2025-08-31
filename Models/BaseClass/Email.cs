@@ -1,5 +1,4 @@
-﻿using ScottmenMainApi.Models.BLayer;
-using ScottmenMainApi.Models.DLayer;
+﻿
 using System.ComponentModel;
 using System.Net;
 using System.Net.Http.Headers;
@@ -29,7 +28,7 @@ namespace BaseClass
             }
             catch { throw; }
         }
-        public async Task<ReturnClass.ReturnBool> SendAsync(string ToAddres, string emailSubject, string emailBody, List<Attachment> Attachments)
+        public async Task<ReturnClass.ReturnBool> SendAsync(string ToAddress, string emailSubject, string emailBody, List<Attachment> Attachments)
         {
             ReturnClass.ReturnBool rb = new();
             MailMessage message = new();
@@ -39,7 +38,7 @@ namespace BaseClass
                 ServicePointManager.ServerCertificateValidationCallback += (s, ce, ca, p) => true;
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
                 message.From = new MailAddress(_senderEmail);
-                message.To.Add(new MailAddress(ToAddres));
+                message.To.Add(new MailAddress(ToAddress));
                 message.Subject = emailSubject;
                 message.IsBodyHtml = true; //to make message body as html  
                 message.Body = emailBody;
@@ -87,7 +86,7 @@ namespace BaseClass
             }
             return rb;
         }
-        public async Task<ReturnClass.ReturnBool> SendAsync(string ToAddres, string emailSubject, string emailBody, List<Attachment> Attachments, string ccAddress)
+        public async Task<ReturnClass.ReturnBool> SendAsync(string ToAddress, string emailSubject, string emailBody, List<Attachment> Attachments, string ccAddress)
         {
             ReturnClass.ReturnBool rb = new();
             try
@@ -95,7 +94,7 @@ namespace BaseClass
                 MailMessage message = new();
                 SmtpClient smtp = new();
                 message.From = new MailAddress(_senderEmail);
-                message.To.Add(new MailAddress(ToAddres));
+                message.To.Add(new MailAddress(ToAddress));
                 message.CC.Add(new MailAddress(ccAddress));
                 message.Subject = emailSubject;
                 message.IsBodyHtml = true; //to make message body as html  
@@ -107,7 +106,7 @@ namespace BaseClass
                 smtp.EnableSsl = true;
                 smtp.DeliveryMethod = SmtpDeliveryMethod.Network;
                 smtp.Credentials = new NetworkCredential(_senderEmail, _password);
-
+                
                 #region Attachments
                 try
                 {
@@ -142,31 +141,6 @@ namespace BaseClass
         }
 
 
-        public async Task<ReturnClass.ReturnBool> SendEmailViaURLAsync(emailSenderClass emailsend)
-        {
-            ReturnClass.ReturnBool rb = new();
-            try
-            {
-                Uri url = new Uri(emailSenderUrl);
-                HttpClient client = new();
-                client.BaseAddress = url;
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));   //ACCEPT header         
-                HttpResponseMessage response = await client.PostAsJsonAsync(url, emailsend);
-                response.EnsureSuccessStatusCode(); // throws if not 200-299
-                var contentStream = await response.Content.ReadAsStreamAsync();
-                rb = await JsonSerializer.DeserializeAsync<ReturnClass.ReturnBool>(contentStream);
-            }
-            catch (Exception ex)
-            {
-                rb.message = "Failed to send email";
-                WriteLog.Error("email(error)", ex);
-            }
-
-
-            return rb;
-        }
-        //senderURL
 
 
         private void SendCompletedCallback(object sender, AsyncCompletedEventArgs e)

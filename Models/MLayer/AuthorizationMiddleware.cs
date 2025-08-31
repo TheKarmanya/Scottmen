@@ -1,8 +1,9 @@
 ﻿using ScottmenMainApi.Models.BLayer;
 using ScottmenMainApi.Models.DLayer;
+using ScottmenMainApi.Models.MLayer;
 using static BaseClass.ReturnClass;
 
-namespace ScottmenMainApi.Middlewares
+namespace ScottmenMainApi.Models.MLayer
 {
     public class AuthorizationMiddleware
     {
