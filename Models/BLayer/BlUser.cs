@@ -412,6 +412,7 @@ namespace ScottmenMainApi.Models.BLayer
     {
         public long? itemStockId { get; set; } = 0;
         public long? unloadingId { get; set; } = 0;
+        public long? purchaseOrderId { get; set; } = 0;
         public Int16? itemId { get; set; } = 0;
         public string? itemName { get; set; }
         public Int64? quantity { get; set; } = 0;

@@ -3608,7 +3608,7 @@ namespace ScottmenMainApi.Models.DLayer
            };
             query = @"SELECT  i.itemId,i.itemName,i.shortName,i.unitId,
                             i.itemTypeId,i.itemTypeName,i.categoryType,i.quantity
-                       , i.unitName 
+                       , i.unitName ,i.threshold
                         FROM itemmaster i
                                   WHERE  i.active=@active";
             if (itemId != 0)
@@ -4097,7 +4097,8 @@ namespace ScottmenMainApi.Models.DLayer
                     rb = await db.ExecuteQueryAsync(query, pm, "SaveUnloadingEntry");
                     if (rb.status)
                     {
-                        rb = await AddUnloadingItemsAsync(bl, 1);
+                        if (bl.GatePassItems.Count > 0)
+                            rb = await AddUnloadingItemsAsync(bl, 1);
                         if (rb.status)
                         {
                             ts.Complete();
@@ -4186,23 +4187,27 @@ namespace ScottmenMainApi.Models.DLayer
                     rb = await db.ExecuteQueryAsync(query, pm, "Updateunloadingentry");
                     if (rb.status)
                     {
-                        query = @"INSERT INTO unloadingitemslog
+                        if (bl.GatePassItems.Count > 0)
+                        {
+                            query = @"INSERT INTO unloadingitemslog
                                   SELECT * FROM  unloadingitems
 										   WHERE unloadingId=@unloadingId";
-                        rb = await db.ExecuteQueryAsync(query, pm, "Updateunloadingitemslog");
-                        if (rb.status)
-                        {
-                            query = @"DELETE FROM  unloadingitems
-										   WHERE unloadingId=@unloadingId";
-                            rb = await db.ExecuteQueryAsync(query, pm, "Updateunloadingitems");
+                            rb = await db.ExecuteQueryAsync(query, pm, "Updateunloadingitemslog");
                             if (rb.status)
                             {
-                                rb = await AddUnloadingItemsAsync(bl, 1);
+                                query = @"DELETE FROM  unloadingitems
+										   WHERE unloadingId=@unloadingId";
+                                rb = await db.ExecuteQueryAsync(query, pm, "Updateunloadingitems");
                                 if (rb.status)
-                                    ts.Complete();
+                                {
+                                    rb = await AddUnloadingItemsAsync(bl, 1);
 
+
+                                }
                             }
                         }
+                        if (rb.status)
+                            ts.Complete();
                     }
                 }
             }
@@ -5074,6 +5079,14 @@ namespace ScottmenMainApi.Models.DLayer
                     if (rb.status)
                     {
                         rb = await AddItemInStockAsync(itemStock, ItemStockId, isItemExistsInStock, 1);
+                        if (rb.status)
+                        {
+                            itemStock[0].purchaseOrderId = itemStock[0].purchaseOrderId == null ? 0 : itemStock[0].purchaseOrderId;
+                            if (itemStock[0].purchaseOrderId > 0)
+                                rb = await UpdatePurchaseOrderBalnceQuantity((long)itemStock[0].purchaseOrderId, (decimal)itemStock[0].quantity,
+                                    (long)itemStock[0].userId, itemStock[0].clientIp);
+
+                        }
                         if (rb.status)
                             ts.Complete();
                     }
@@ -7357,8 +7370,8 @@ namespace ScottmenMainApi.Models.DLayer
 
         public async Task<ReturnClass.ReturnBool> SavePurchaseOrder(PurchaseOrder purchaseOrder)
         {
-            string query = @"insert into purchaseorder (purchaseOrderId,vendorId,itemId,quantity,active,clientIp,userId)
-                                  values (@purchaseOrderId,@vendorId,@itemId,@quantity,@active,@clientIp,@userId)";
+            string query = @"insert into purchaseorder (purchaseOrderId,vendorId,itemId,quantity,balanceQuantity,active,clientIp,userId)
+                                  values (@purchaseOrderId,@vendorId,@itemId,@quantity,@quantity,@active,@clientIp,@userId)";
             purchaseOrder.purchaseOrderId = await GeneratePurchaseOrderID();
             if (purchaseOrder.purchaseOrderId == 0)
             {
@@ -7403,13 +7416,42 @@ namespace ScottmenMainApi.Models.DLayer
                 if (returnBool.status)
                 {
                     query = @"UPDATE purchaseorder SET vendorId=@vendorId,
-                                                    itemId=@itemId,quantity=@quantity,clientIp=@clientIp,userId=@userId WHERE 
+                                                    itemId=@itemId,quantity=@quantity,balanceQuantity=@quantity,clientIp=@clientIp,userId=@userId 
+                                                    WHERE 
                                                   purchaseOrderId=@purchaseOrderId ";
                     returnBool = await db.ExecuteQueryAsync(query, pm.ToArray(), "UpdatePurchaseOrder");
                 }
                 if (returnBool.status)
                     ts.Complete();
             }
+            return returnBool;
+        }
+        public async Task<ReturnClass.ReturnBool> UpdatePurchaseOrderBalnceQuantity(Int64 purchaseOrderId, decimal quantity, Int64 userId, string clientIp)
+        {
+            string query = @"INSERT INTO purchaseorderlog
+                                        SELECT * FROM purchaseorder
+                                        WHERE purchaseOrderId=@purchaseOrderId ";
+            ReturnBool returnBool = new();
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+              new MySqlParameter("@purchaseOrderId", MySqlDbType.Int64) { Value = purchaseOrderId},
+              new MySqlParameter("@quantity", MySqlDbType.Decimal) { Value = quantity},
+              //new MySqlParameter("@active", MySqlDbType.Int16) { Value = purchaseOrder.active},
+               new MySqlParameter("@userId", MySqlDbType.Int64) { Value = userId},
+                new MySqlParameter("@clientIp", MySqlDbType.String) { Value = clientIp}
+                 };
+
+            returnBool = await db.ExecuteQueryAsync(query, pm.ToArray(), "InsertPurchaseOrderlog");
+
+            if (returnBool.status)
+            {
+                query = @"UPDATE purchaseorder SET balanceQuantity=balanceQuantity-@quantity,clientIp=@clientIp,userId=@userId 
+                                                    WHERE 
+                                                  purchaseOrderId=@purchaseOrderId AND balanceQuantity >= @quantity ";
+                returnBool = await db.ExecuteQueryAsync(query, pm.ToArray(), "PurchaseOrderBalance");
+            }
+
+
             return returnBool;
         }
         /// <summary>
@@ -7467,12 +7509,55 @@ namespace ScottmenMainApi.Models.DLayer
             //}
 
             query = @"SELECT m.purchaseOrderId,m.vendorId,v.vendorName,m.itemId,i.itemName,i.unitName,i.shortName,
-                            m.quantity,v.email AS vendorMailId,m.isMailSent,IFNULL(mt.templateId,0) AS templateId
+                            m.quantity,m.balanceQuantity,v.email AS vendorMailId,m.isMailSent,IFNULL(mt.templateId,0) AS templateId
                         FROM purchaseorder m
                         JOIN vendormaster v ON v.vendorId=m.vendorId
                         JOIN itemmaster i ON  i.itemId=m.itemId
                         LEFT JOIN mailtemplate mt ON mt.vendorId=m.vendorId AND mt.itemId=m.itemId
                         WHERE  m.active=@active
+                         " + WHERE + " ORDER BY m.creationTimeStamp DESC;";
+            dt = await db.ExecuteSelectQueryAsync(query, pm);
+            if (dt.table.Rows.Count == 0)
+                dt.status = false;
+            return dt;
+        }
+        public async Task<ReturnDataTable> GetRemainingPurchaseOrder(PurchaseOrder purchaseOrder)
+        {
+            string query = "";
+            ReturnDataSet ds = new();
+            purchaseOrder.purchaseOrderId = purchaseOrder.purchaseOrderId == null ? 0 : purchaseOrder.purchaseOrderId;
+            purchaseOrder.vendorId = purchaseOrder.vendorId == null ? 0 : purchaseOrder.vendorId;
+            purchaseOrder.itemId = purchaseOrder.itemId == null ? 0 : purchaseOrder.itemId;
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+              new MySqlParameter("@purchaseOrderId", MySqlDbType.Int64) { Value = purchaseOrder.purchaseOrderId},
+              new MySqlParameter("@vendorId", MySqlDbType.Int64) { Value = purchaseOrder.vendorId},
+              new MySqlParameter("@itemId", MySqlDbType.Int64) { Value = purchaseOrder.itemId},
+              new MySqlParameter("@active", MySqlDbType.Int16) { Value = (Int16)YesNo.Yes},
+
+                 };
+            String WHERE = "";
+            if (purchaseOrder.purchaseOrderId > 0)
+                WHERE += @" AND m.purchaseOrderId=@purchaseOrderId ";
+            if (purchaseOrder.vendorId > 0)
+                WHERE += @" AND m.vendorId=@vendorId ";
+            if (purchaseOrder.itemId > 0)
+                WHERE += @" AND m.itemId=@itemId ";
+
+            //if (string.IsNullOrEmpty(WHERE))
+            //{
+            //    dt.status = false;
+            //    dt.message = "Invalid Parameters";
+            //    return dt;
+            //}
+
+            query = @"SELECT m.purchaseOrderId,m.vendorId,v.vendorName,m.itemId,i.itemName,i.unitName,i.shortName,
+                            m.quantity,m.balanceQuantity
+                        FROM purchaseorder m
+                        JOIN vendormaster v ON v.vendorId=m.vendorId
+                        JOIN itemmaster i ON  i.itemId=m.itemId
+                        LEFT JOIN mailtemplate mt ON mt.vendorId=m.vendorId AND mt.itemId=m.itemId
+                        WHERE  m.active=@active AND m.balanceQuantity > 0
                          " + WHERE + " ORDER BY m.creationTimeStamp DESC;";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
             if (dt.table.Rows.Count == 0)
@@ -7527,7 +7612,7 @@ namespace ScottmenMainApi.Models.DLayer
             smsbody.messageServerResponse = status == true ? "Success" : "Failed";
             smsbody.actionId = 1;
 
-            smsbody.msgId = await dlCommon.GenerateSMSMsgId();
+            smsbody.msgId = await dlCommon.GenerateEmailMsgId();
             try
             {
                 rb = await dlCommon.SendEmailSaveAsync(smsbody);
