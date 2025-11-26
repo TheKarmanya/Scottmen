@@ -814,6 +814,23 @@ namespace ScottmenMainApi.Controllers
             //else
             //    rb.message = "User not authorized to access the report";
         }
+        [HttpPost("afterblending")]
+        // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnString> AfterBlendingProcessAsync([FromBody] Blending blending)
+        {
+            blending.userId = 0;//Convert.ToInt64(User.FindFirst("userId")?.Value);
+                                // itemStock[0].roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            blending.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{
+
+            return await dl.AfterBlendngDeepEntry(blending);
+
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
+        }
         [HttpPost("removeblendingprocess")]
         // [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ReturnBool> removeBlendingProcessAsync([FromBody] RemobeBlendingProcess blending)
@@ -1304,6 +1321,22 @@ namespace ScottmenMainApi.Controllers
         {
             // Remove invisible/Unicode control characters
             return Regex.Replace(email, @"[^\u0000-\u007F]+", "");
+        }
+        [HttpPost("getdeepvalue")]
+        //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ReturnDataTable> GetDeepingValue(VatDeepCaluclation vatDeep)
+        {
+            ReturnBool rb = new();
+            //long userId = Convert.ToInt64(User.FindFirst("userId")?.Value);
+            //int roleId = Convert.ToInt16(User.FindFirstValue(ClaimTypes.Role));
+            // blUser.clientIp = Utilities.GetRemoteIPAddress(this.HttpContext, true);
+            // ReturnString rs = new();
+            //if (roleId == (int)UserRole.Administrator)
+            //{            
+            return await dl.GetDeepCalculation(vatDeep);
+            //}
+            //else
+            //    rb.message = "User not authorized to access the report";
         }
 
 

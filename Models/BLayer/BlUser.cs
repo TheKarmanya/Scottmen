@@ -461,7 +461,11 @@ namespace ScottmenMainApi.Models.BLayer
         public long? userId { get; set; }
         public string? clientIp { get; set; }
         public decimal? density { get; set; }
-        
+        public decimal? densityQuantity { get; set; }
+        public decimal? totalDeep { get; set; }
+        public decimal? totaldeepQuantity  { get; set; }
+        public decimal? finalDeep  { get; set; }
+        public decimal? finalDeepQuantity { get; set; }
         public List<BlendingItems> blendingItems { get; set; }
 
     }
@@ -472,6 +476,7 @@ namespace ScottmenMainApi.Models.BLayer
         public string? itemName { get; set; }
         public Int64? quantity { get; set; }
         public Int64? updatedQuantity { get; set; } = 0;
+        public decimal? deep { get; set; } = 0;
         public Int64? oldQuantity { get; set; } = 0;
         public Int16? unitId { get; set; }
         public string? unitName { get; set; }
@@ -693,6 +698,12 @@ namespace ScottmenMainApi.Models.BLayer
     {
         public decimal? density { get; set; } = 0;
         public decimal? avp { get; set; } = 4000;
+
+    }
+    public class VatDeepCaluclation
+    {
+        public Int16? vatNo { get; set; } = 0;
+        public decimal? cm { get; set; } = 0;
 
     }
 

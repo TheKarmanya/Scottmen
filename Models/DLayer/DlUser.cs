@@ -5173,7 +5173,7 @@ namespace ScottmenMainApi.Models.DLayer
         private async Task<ReturnClass.ReturnDataTable> GetItemQuantityInStock(Int64 itemStockId)
         {
             ReturnClass.ReturnString rs = new();
-            string query = @"SELECT e.itemStockId,e.quantity,e.itemId
+            string query = @"SELECT e.itemStockId,e.quantity,e.itemId,e.purchaseOrderId
                              FROM itemstockdetail e 
                                 WHERE  
                                 e.itemStockId = @itemStockId;";
@@ -5187,7 +5187,7 @@ namespace ScottmenMainApi.Models.DLayer
 
         private async Task<ReturnClass.ReturnBool> AddItemInStockAsync(List<ItemStock> itemStocks, Int64 ItemStockId, bool isItemExistsInStock, int counter = 1)
         {
-            string query = @"insert into itemstockdetail(itemStockId, unloadingId, itemId,itemName,
+            string query = @"insert into itemstockdetail(itemStockId, unloadingId, purchaseOrderId,itemId,itemName,
                                         quantity,unitId,unitName,ageing,SerialNoFrom,SerialNoTo,
                                         expiryDate,remark,amount,active,clientIp,userId)
                                   values ";
@@ -5227,7 +5227,7 @@ namespace ScottmenMainApi.Models.DLayer
                 //}
                 #endregion
 
-                query += @"(@itemStockId" + counter.ToString() + ", @unloadingId" + counter.ToString() + ", @itemId" + counter.ToString() +
+                query += @"(@itemStockId" + counter.ToString() + ", @unloadingId" + counter.ToString() + ", @purchaseOrderId" + counter.ToString() + ", @itemId" + counter.ToString() +
                             ", @itemName" + counter.ToString() + ", @quantity" + counter.ToString() + ", @unitId" + counter.ToString() +
                                 ", @unitName" + counter.ToString() + ", @ageing" + counter.ToString() + ", @SerialNoFrom" + counter.ToString() +
                                ", @SerialNoTo" + counter.ToString() + ", @expiryDate" + counter.ToString() + ", @remark" + counter.ToString() +
@@ -5238,6 +5238,7 @@ namespace ScottmenMainApi.Models.DLayer
 
                 pm.Add(new MySqlParameter("itemStockId" + counter.ToString(), MySqlDbType.Int64) { Value = ItemStockId });
                 pm.Add(new MySqlParameter("unloadingId" + counter.ToString(), MySqlDbType.Int64) { Value = itemStock.unloadingId });
+                pm.Add(new MySqlParameter("purchaseOrderId" + counter.ToString(), MySqlDbType.Int64) { Value = itemStock.purchaseOrderId });
                 pm.Add(new MySqlParameter("itemId" + counter.ToString(), MySqlDbType.Int32) { Value = itemStock.itemId });
                 pm.Add(new MySqlParameter("itemName" + counter.ToString(), MySqlDbType.VarString) { Value = itemStock.itemName });
                 pm.Add(new MySqlParameter("quantity" + counter.ToString(), MySqlDbType.Int64) { Value = itemStock.quantity });
@@ -5277,6 +5278,7 @@ namespace ScottmenMainApi.Models.DLayer
             }
             Int32 itemId = Convert.ToInt32(dt1.table.Rows[0]["itemId"].ToString());
             Int64 quantity = Convert.ToInt64(dt1.table.Rows[0]["quantity"].ToString());
+            Int64 purchaseOrderId = Convert.ToInt64(dt1.table.Rows[0]["purchaseOrderId"].ToString());
 
             MySqlParameter[] pm = new MySqlParameter[] {
 
@@ -5302,8 +5304,14 @@ namespace ScottmenMainApi.Models.DLayer
                         rb = await DecreaseItems((Int32)itemId!, (long)quantity!);
                     if (rb.status)
                     {
-                        rb.message = "Item has been Removed.";
-                        ts.Complete();
+
+                        if (rb.status && (Int64)purchaseOrderId > 0)
+                            rb = await IncreasePurchaseOrderBalnceQuantity((Int64)purchaseOrderId, (decimal)quantity!, 0, "");
+                        if (rb.status)
+                        {
+
+                            ts.Complete();
+                        }
                     }
                 }
 
@@ -5343,7 +5351,7 @@ namespace ScottmenMainApi.Models.DLayer
 
             query = @"SELECT  u.itemStockId, u.unloadingId, u.itemId,u.itemName,
                                         u.quantity,u.unitId,u.unitName,u.ageing,u.SerialNoFrom,u.SerialNoTo,
-                                       DATE_FORMAT( u.expiryDate,'%d/%m/%Y') AS expiryDate,u.remark,u.amount
+                                       DATE_FORMAT( u.expiryDate,'%d/%m/%Y') AS expiryDate,u.remark,u.amount,u.purchaseOrderId
                              FROM itemstockdetail u
                        WHERE u.active=@active " + WHERE + @"
                       ORDER BY u.creationTimeStamp DESC ";
@@ -5491,13 +5499,14 @@ namespace ScottmenMainApi.Models.DLayer
         {
             string query1 = @"insert into blendingmaster (batchId,containerId,containerName,brandId,brandName,
                                                     totalQuantity,balanceQuantity,unitId,unitName,remark,
-                                                startDate,active,clientIp,userId,density)
+                                                startDate,active,clientIp,userId,density,densityQuantity,totalDeep,totaldeepQuantity)
                                   values (@batchId,@containerId,@containerName,@brandId,@brandName,
                                             @totalQuantity,@balanceQuantity,@unitId,@unitName,@remark,
-                                            NOW(),@active,@clientIp,@userId,@density)";
+                                            NOW(),@active,@clientIp,@userId,@density,@densityQuantity,@totalDeep,@totaldeepQuantity)";
             string query = "";
+            //densityQuantity,totalDeep,totaldeepQuantity,finalDeep,finalDeepQuantity,@finalDeep,@finalDeepQuantity
             //blending.totalQuantity = blending.blendingItems.Where(x => x.applicationFor == 1).Sum(x => x.equipmentCount);
-            blending.totalQuantity = blending.blendingItems.Sum(x => x.quantity);
+            blending.totalQuantity = blending.totaldeepQuantity;// blending.blendingItems.Sum(x => x.quantity);
             blending.balanceQuantity = blending.totalQuantity;
 
             MySqlParameter[] pm1 = new MySqlParameter[] {
@@ -5516,10 +5525,17 @@ namespace ScottmenMainApi.Models.DLayer
                new MySqlParameter("@userId", MySqlDbType.Int64) { Value = blending.userId},
                 new MySqlParameter("@clientIp", MySqlDbType.String) { Value = blending.clientIp},
                 new MySqlParameter("@density", MySqlDbType.Decimal) { Value = blending.density},
+
+                  new MySqlParameter("@densityQuantity", MySqlDbType.Decimal) { Value = blending.densityQuantity},
+                    new MySqlParameter("@totalDeep", MySqlDbType.Decimal) { Value = blending.totalDeep},
+                      new MySqlParameter("@totaldeepQuantity", MySqlDbType.Decimal) { Value = blending.totaldeepQuantity},
+                       // new MySqlParameter("@finalDeep", MySqlDbType.Decimal) { Value = blending.finalDeep},
+                        //  new MySqlParameter("@finalDeepQuantity", MySqlDbType.Decimal) { Value = blending.finalDeepQuantity},
+                         
           };
             List<MySqlParameter> pm = new();
             query = @"insert into blendingitem (batchId,itemId,itemName,quantity,
-                                               unitId,unitName,active,clientIp,userId)
+                                               unitId,unitName,active,clientIp,userId,deep)
                                   values ";
             string updateQuery = "";
             foreach (BlendingItems blendingItem in blending.blendingItems)
@@ -5529,19 +5545,20 @@ namespace ScottmenMainApi.Models.DLayer
                             ", @itemName" + counter.ToString() + ", @quantity" + counter.ToString() +
                             ", @unitId" + counter.ToString() + ", @unitName" + counter.ToString() +
                             ", @active" + counter.ToString() + ", @clientIp" + counter.ToString() +
-                            ", @userId" + counter.ToString() + "),";
+                            ", @userId" + counter.ToString() + ", @deep" + counter.ToString() + "),";
 
                 pm.Add(new MySqlParameter("batchId" + counter.ToString(), MySqlDbType.Int64) { Value = blending.batchId });
 
                 pm.Add(new MySqlParameter("itemId" + counter.ToString(), MySqlDbType.Int64) { Value = blendingItem.itemId });
                 pm.Add(new MySqlParameter("itemName" + counter.ToString(), MySqlDbType.VarString) { Value = blendingItem.itemName });
-                pm.Add(new MySqlParameter("quantity" + counter.ToString(), MySqlDbType.Int64) { Value = blendingItem.quantity });
-                pm.Add(new MySqlParameter("updatedQuantity" + counter.ToString(), MySqlDbType.Int64) { Value = blendingItem.updatedQuantity });
+                pm.Add(new MySqlParameter("quantity" + counter.ToString(), MySqlDbType.Decimal) { Value = blendingItem.quantity });
+                pm.Add(new MySqlParameter("updatedQuantity" + counter.ToString(), MySqlDbType.Decimal) { Value = blendingItem.updatedQuantity });
                 pm.Add(new MySqlParameter("unitId" + counter.ToString(), MySqlDbType.VarString) { Value = blendingItem.unitId });
                 pm.Add(new MySqlParameter("unitName" + counter.ToString(), MySqlDbType.Int64) { Value = blendingItem.unitName });
                 pm.Add(new MySqlParameter("active" + counter.ToString(), MySqlDbType.Int16) { Value = (Int16)IsActive.Yes });
                 pm.Add(new MySqlParameter("clientIp" + counter.ToString(), MySqlDbType.String) { Value = blending.clientIp });
                 pm.Add(new MySqlParameter("userId" + counter.ToString(), MySqlDbType.Int64) { Value = blending.userId });
+                pm.Add(new MySqlParameter("deep" + counter.ToString(), MySqlDbType.Decimal) { Value = blendingItem.deep });
                 updateQuery = "";
 
                 ReturnBool rb = await DecreaseItems((Int32)blendingItem.itemId!, (long)blendingItem.quantity!);
@@ -5562,6 +5579,45 @@ namespace ScottmenMainApi.Models.DLayer
 
 
         }
+
+        public async Task<ReturnClass.ReturnString> AfterBlendngDeepEntry(Blending blending)
+        {
+            ReturnString returnString = new();
+            returnString.status = false;
+            returnString.message = "Somethng went wrong, please try again.";
+            string query1 = @"Update blendingmaster 
+                             SET  
+                            finalDeep=@finalDeep,finalDeepQuantity=@finalDeepQuantity,
+                            totalQuantity=@finalDeepQuantity,balanceQuantity=@finalDeepQuantity
+                             clientIp=@clientIp,userId=@userId ,remark=@remark
+                                WHERE batchId=@batchId";
+            string query = "";
+
+            MySqlParameter[] pm1 = new MySqlParameter[] {
+
+              new MySqlParameter("@batchId", MySqlDbType.Int64) { Value = blending.batchId},
+              new MySqlParameter("@finalDeep", MySqlDbType.Decimal) { Value = blending.finalDeep},
+              new MySqlParameter("@finalDeepQuantity", MySqlDbType.Decimal) { Value = blending.finalDeepQuantity},
+                new MySqlParameter("@remark", MySqlDbType.VarChar) { Value = blending.remark},
+              new MySqlParameter("@active", MySqlDbType.Int16) { Value = blending.active},
+               new MySqlParameter("@userId", MySqlDbType.Int64) { Value = blending.userId},
+                new MySqlParameter("@clientIp", MySqlDbType.String) { Value = blending.clientIp},
+
+
+          };
+
+            ReturnBool returnBool = await db.ExecuteQueryAsync(query1, pm1.ToArray(), "afterBlending");
+            if (returnBool.status)
+            {
+                returnString.status = true;
+                returnString.message = "Blending Completed.";
+            }
+            return returnString;
+
+
+        }
+
+
         private async Task<ReturnClass.ReturnDataTable> GetItemQuantityfromBlendingProcess(Int64 batchId, Int32 itemId)
         {
             ReturnClass.ReturnString rs = new();
@@ -5662,7 +5718,7 @@ namespace ScottmenMainApi.Models.DLayer
             query = @"SELECT bm.batchId,bm.containerId,bm.containerName,bm.brandId,bm.brandName,
                             bm.totalQuantity,bm.balanceQuantity,bm.unitId,bm.unitName,bm.remark,
                             bm.startDate,
-                            bm.endDate,bm.emptyDate,bm.density
+                            bm.endDate,bm.emptyDate,bm.density,bm.densityQuantity,bm.totalDeep,bm.totaldeepQuantity,bm.finalDeep,bm.finalDeepQuantity
                              FROM blendingmaster bm 
                             WHERE bm.active=@active " + WHERE + "  ORDER BY bm.batchId DESC ";
             dt = await db.ExecuteSelectQueryAsync(query, pm);
@@ -5672,7 +5728,7 @@ namespace ScottmenMainApi.Models.DLayer
 
                 dt.table.TableName = "blendingMaster";
                 ds.dataset.Tables.Add(dt.table);
-                query = @"SELECT bm.batchId,bi.itemId,bi.itemName,bi.quantity,bi.unitId,bi.unitName
+                query = @"SELECT bm.batchId,bi.itemId,bi.itemName,bi.quantity,bi.unitId,bi.unitName,bi.deep
                          FROM blendingmaster bm 
                         JOIN blendingitem bi ON bi.batchId=bm.batchId
                         WHERE bi.active=@active " + WHERE;
@@ -7454,6 +7510,34 @@ namespace ScottmenMainApi.Models.DLayer
 
             return returnBool;
         }
+        public async Task<ReturnClass.ReturnBool> IncreasePurchaseOrderBalnceQuantity(Int64 purchaseOrderId, decimal quantity, Int64 userId, string clientIp)
+        {
+            string query = @"INSERT INTO purchaseorderlog
+                                        SELECT * FROM purchaseorder
+                                        WHERE purchaseOrderId=@purchaseOrderId ";
+            ReturnBool returnBool = new();
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+              new MySqlParameter("@purchaseOrderId", MySqlDbType.Int64) { Value = purchaseOrderId},
+              new MySqlParameter("@quantity", MySqlDbType.Decimal) { Value = quantity},
+              //new MySqlParameter("@active", MySqlDbType.Int16) { Value = purchaseOrder.active},
+               new MySqlParameter("@userId", MySqlDbType.Int64) { Value = userId},
+                new MySqlParameter("@clientIp", MySqlDbType.String) { Value = clientIp}
+                 };
+
+            returnBool = await db.ExecuteQueryAsync(query, pm.ToArray(), "InsertPurchaseOrderlog");
+
+            if (returnBool.status)
+            {
+                query = @"UPDATE purchaseorder SET balanceQuantity=balanceQuantity+@quantity,clientIp=@clientIp,userId=@userId 
+                                                    WHERE 
+                                                  purchaseOrderId=@purchaseOrderId AND balanceQuantity < @quantity ";
+                returnBool = await db.ExecuteQueryAsync(query, pm.ToArray(), "PurchaseOrderBalance");
+            }
+
+
+            return returnBool;
+        }
         /// <summary>
         /// Returns Generate Purchase Order ID 9+DDMM + NNN
         /// </summary>
@@ -7520,6 +7604,34 @@ namespace ScottmenMainApi.Models.DLayer
             if (dt.table.Rows.Count == 0)
                 dt.status = false;
             return dt;
+        }
+        /// <summary>
+        /// 
+        /// Get Get Template
+        /// </summary>
+        /// <returns></returns>
+        public async Task<ReturnDataTable> GetDeepCalculation(VatDeepCaluclation vatDeep)
+        {
+            string query = "";
+            ReturnDataTable dt1 = new();
+            vatDeep.vatNo = vatDeep.vatNo == null ? 0 : vatDeep.vatNo;
+            vatDeep.cm = vatDeep.cm == null ? 0 : vatDeep.cm;
+            if (vatDeep.vatNo == 0 || vatDeep.cm == 0)
+            { dt1.status = false; dt1.message = "Invalid Parameters"; return dt1; }
+            MySqlParameter[] pm = new MySqlParameter[] {
+
+              new MySqlParameter("@vatNo", MySqlDbType.Int16) { Value =vatDeep.vatNo},
+              new MySqlParameter("@cm", MySqlDbType.Decimal) { Value = vatDeep.cm},
+
+
+                 };
+            query = @"SELECT v.vid,v.vatNo,v.cm,v.detail 
+                                FROM vatcalculation v 
+                            WHERE v.vatNo=@vatNo AND v.cm =@cm;";
+            dt1 = await db.ExecuteSelectQueryAsync(query, pm);
+            if (dt1.table.Rows.Count == 0)
+                dt1.status = false;
+            return dt1;
         }
         public async Task<ReturnDataTable> GetRemainingPurchaseOrder(PurchaseOrder purchaseOrder)
         {
